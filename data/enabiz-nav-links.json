@@ -2,10 +2,19 @@
   "discovered": {
     "labs": "https://enabiz.gov.tr/Home/Tahlillerim",
     "prescriptions": "https://enabiz.gov.tr/Home/Recetelerim",
-    "visits": "https://enabiz.gov.tr/Home/Randevularim",
+    "visits": "https://enabiz.gov.tr/Home/Ziyaretlerim",
     "radiology": "https://enabiz.gov.tr/Home/RadyolojikGoruntulerim",
     "allergies": "https://enabiz.gov.tr/Home/Alerjilerim",
-    "vaccines": "https://www.saglik.gov.tr/TR-109182/bakan-memisoglu-yanik-tedavi-hizmetleri-62-merkezde-780-yatak-kapasitesine-ulasti.html"
+    "vaccines": "https://enabiz.gov.tr/Home/AsiTakvimi",
+    "chronic": "https://enabiz.gov.tr/Home/Hastaliklarim",
+    "diagnoses": "https://enabiz.gov.tr/Home/Hastaliklarim",
+    "epicrisis": "https://enabiz.gov.tr/Home/Epikrizlerim",
+    "reports": "https://enabiz.gov.tr/Home/Raporlarim",
+    "pathology": "https://enabiz.gov.tr/Home/Patolojilerim",
+    "medications": "https://enabiz.gov.tr/Home/Ilaclarim",
+    "screenings": "https://enabiz.gov.tr/Home/Taramalar",
+    "emergencyNotes": "https://enabiz.gov.tr/Home/AcilDurumNotlarim",
+    "documents": "https://enabiz.gov.tr/Home/Dokumanlarim"
   },
   "allLinks": [
     {
@@ -249,5 +258,5 @@
       "text": "0850 240 03 03"
     }
   ],
-  "timestamp": "2026-03-09T14:27:03.964Z"
+  "timestamp": "2026-03-09T17:48:21.523Z"
 }
