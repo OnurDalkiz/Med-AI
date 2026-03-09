@@ -338,22 +338,22 @@ router.get('/calendar/:patientId/:year/:month', (req, res) => {
 
   // Tıbbi olaylar
   const events = db.prepare(
-    'SELECT event_date, event_type, title, description FROM medical_events WHERE patient_id = ? AND event_date BETWEEN ? AND ? ORDER BY event_date'
+    'SELECT id, event_date, event_type, title, description FROM medical_events WHERE patient_id = ? AND event_date BETWEEN ? AND ? ORDER BY event_date'
   ).all(patientId, startDate, endDate);
 
   // Tahlil sonuçları (tarih bazında gruplanmış)
   const labs = db.prepare(
-    'SELECT test_date, test_name, test_value, unit, is_abnormal FROM lab_results WHERE patient_id = ? AND test_date BETWEEN ? AND ? ORDER BY test_date'
+    'SELECT id, test_date, test_name, test_value, unit, is_abnormal FROM lab_results WHERE patient_id = ? AND test_date BETWEEN ? AND ? ORDER BY test_date'
   ).all(patientId, startDate, endDate);
 
   // İlaç başlangıçları
   const meds = db.prepare(
-    'SELECT name, dosage, start_date, end_date FROM medications WHERE patient_id = ? AND start_date BETWEEN ? AND ?'
+    'SELECT id, name, dosage, start_date, end_date FROM medications WHERE patient_id = ? AND start_date BETWEEN ? AND ?'
   ).all(patientId, startDate, endDate);
 
   // Hatırlatıcılar
   const reminders = db.prepare(
-    'SELECT title, description, reminder_type, reminder_date, reminder_time FROM reminders WHERE patient_id = ? AND active = 1 AND reminder_date BETWEEN ? AND ?'
+    'SELECT id, title, description, reminder_type, reminder_date, reminder_time FROM reminders WHERE patient_id = ? AND active = 1 AND reminder_date BETWEEN ? AND ?'
   ).all(patientId, startDate, endDate);
 
   // Gün bazında grupla
@@ -361,25 +361,50 @@ router.get('/calendar/:patientId/:year/:month', (req, res) => {
   for (const e of events) {
     const day = e.event_date.slice(0, 10);
     if (!days[day]) days[day] = [];
-    days[day].push({ type: 'event', eventType: e.event_type, title: e.title, description: e.description });
+    days[day].push({ type: 'event', id: e.id, eventType: e.event_type, title: e.title, description: e.description });
   }
   for (const l of labs) {
     const day = l.test_date.slice(0, 10);
     if (!days[day]) days[day] = [];
-    days[day].push({ type: 'lab', title: l.test_name, value: `${l.test_value} ${l.unit || ''}`, isAbnormal: l.is_abnormal });
+    days[day].push({ type: 'lab', id: l.id, title: l.test_name, value: `${l.test_value} ${l.unit || ''}`, isAbnormal: l.is_abnormal });
   }
   for (const m of meds) {
     const day = m.start_date.slice(0, 10);
     if (!days[day]) days[day] = [];
-    days[day].push({ type: 'medication', title: m.name, value: m.dosage });
+    days[day].push({ type: 'medication', id: m.id, title: m.name, value: m.dosage });
   }
   for (const r of reminders) {
     const day = r.reminder_date.slice(0, 10);
     if (!days[day]) days[day] = [];
-    days[day].push({ type: 'reminder', reminderType: r.reminder_type, title: r.title, description: r.description, time: r.reminder_time });
+    days[day].push({ type: 'reminder', id: r.id, reminderType: r.reminder_type, title: r.title, description: r.description, time: r.reminder_time });
   }
 
   res.json(days);
+});
+
+// ========== TEKİL KAYIT DETAY ==========
+router.get('/event/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM medical_events WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Kayıt bulunamadı' });
+  res.json(row);
+});
+
+router.get('/lab/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM lab_results WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Kayıt bulunamadı' });
+  res.json(row);
+});
+
+router.get('/medication/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM medications WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Kayıt bulunamadı' });
+  res.json(row);
+});
+
+router.get('/reminder/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM reminders WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'Kayıt bulunamadı' });
+  res.json(row);
 });
 
 // ========== E-NABIZ ENTEGRASYONU ==========
@@ -481,6 +506,11 @@ router.post('/enabiz/fetch', async (req, res) => {
       case 'radiology': result = await scraper.fetchRadiology(); break;
       case 'epicrisis': result = await scraper.fetchEpikriz(); break;
       case 'reports': result = await scraper.fetchReports(); break;
+      case 'allergies': result = await scraper.fetchAllergies(); break;
+      case 'vaccines': result = await scraper.fetchVaccines(); break;
+      case 'chronic': result = await scraper.fetchChronicDiseases(); break;
+      case 'surgeries': result = await scraper.fetchSurgeries(); break;
+      case 'diagnoses': result = await scraper.fetchDiagnoses(); break;
       default: result = await scraper.fetchAll();
     }
 

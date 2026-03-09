@@ -191,7 +191,12 @@ class ENabizScraper {
         labs: ['laboratuvar', 'tahlil', 'lab', 'test sonuç'],
         prescriptions: ['reçete', 'recete', 'ilaç', 'ilac'],
         visits: ['muayene', 'randevu', 'vizit', 'poliklinik', 'başvuru', 'basvuru'],
-        radiology: ['radyoloji', 'görüntüleme', 'goruntuleme', 'mr', 'tomografi', 'röntgen']
+        radiology: ['radyoloji', 'görüntüleme', 'goruntuleme', 'mr', 'tomografi', 'röntgen'],
+        allergies: ['alerji', 'alerjilerim'],
+        vaccines: ['aşı', 'asi', 'aşılarım', 'asilarim'],
+        chronic: ['kronik', 'kronik hastalık', 'kronik hastalik'],
+        surgeries: ['ameliyat', 'ameliyatlarım', 'ameliyatlarim', 'cerrahi', 'operasyon'],
+        diagnoses: ['tanı', 'tani', 'tanılarım', 'tanilarim', 'icd']
       };
 
       for (const [category, keywords] of Object.entries(categories)) {
@@ -221,7 +226,7 @@ class ENabizScraper {
       const linksPath = path.join(__dirname, '..', 'data', 'enabiz-nav-links.json');
       fs.writeFileSync(linksPath, JSON.stringify({ discovered: this.navLinks, allLinks, timestamp: new Date().toISOString() }, null, 2));
 
-      console.log(`✅ ${foundCategories.length}/4 kategori keşfedildi`);
+      console.log(`✅ ${foundCategories.length}/9 kategori keşfedildi`);
       return this.navLinks;
     } catch (e) {
       console.error('❌ Nav keşif hatası:', e.message);
@@ -1668,6 +1673,11 @@ class ENabizScraper {
     results.radiology = await this.fetchRadiology();
     results.epicrisis = await this.fetchEpikriz();
     results.reports = await this.fetchReports();
+    results.allergies = await this.fetchAllergies();
+    results.vaccines = await this.fetchVaccines();
+    results.chronicDiseases = await this.fetchChronicDiseases();
+    results.surgeries = await this.fetchSurgeries();
+    results.diagnoses = await this.fetchDiagnoses();
 
     // Sync log
     const rxCount = results.prescriptions?.prescriptions?.length || 0;
@@ -1675,12 +1685,425 @@ class ENabizScraper {
     db.prepare(
       'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, source) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(this.patientId, new Date().toISOString().split('T')[0], 'note',
-      'E-Nabız Veri Senkronizasyonu (Detaylı)',
-      `Tahlil: ${results.labs.count || 0}, Reçete: ${rxCount} (${medCount} ilaç), Muayene: ${results.visits.length}, Radyoloji: ${results.radiology.length}, Epikriz: ${results.epicrisis.length}, Rapor: ${results.reports.length}`,
+      'E-Nabız Veri Senkronizasyonu (Kapsamlı)',
+      `Tahlil: ${results.labs.count || 0}, Reçete: ${rxCount} (${medCount} ilaç), Muayene: ${results.visits.length}, Radyoloji: ${results.radiology.length}, Epikriz: ${results.epicrisis.length}, Rapor: ${results.reports.length}, Alerji: ${results.allergies.length}, Aşı: ${results.vaccines.length}, Kronik: ${results.chronicDiseases.length}, Ameliyat: ${results.surgeries.length}, Tanı: ${results.diagnoses.length}`,
       'system');
 
-    console.log('\n✅ E-Nabız senkronizasyonu tamamlandı (detaylı)\n');
+    console.log('\n✅ E-Nabız senkronizasyonu tamamlandı (kapsamlı)\n');
     return results;
+  }
+
+  // ============ YENİ VERİ ÇEKME FONKSİYONLARI ============
+
+  // Alerji bilgilerini çek
+  async fetchAllergies() {
+    if (!this.isLoggedIn) throw new Error('Önce giriş yapın');
+    console.log('🤧 Alerji bilgileri çekiliyor...');
+
+    try {
+      const url = this.navLinks.allergies || `${ENABIZ_URL}/Home/Alerjilerim`;
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      const allergies = await this.page.evaluate(() => {
+        const results = [];
+
+        // Tablo formatı
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            const texts = Array.from(cells).map(c => c.textContent?.trim() || '');
+            results.push({
+              allergen: texts[0] || '',
+              type: texts[1] || '',
+              severity: texts[2] || '',
+              reaction: texts[3] || '',
+              date: texts[4] || '',
+              fullText: row.textContent?.trim().substring(0, 500) || ''
+            });
+          }
+        }
+
+        // Card / list formatı
+        if (results.length === 0) {
+          const cards = document.querySelectorAll('.card, .accordion-item, .list-group-item, .alerjiCard');
+          for (const card of cards) {
+            const text = card.textContent?.trim() || '';
+            if (text.length > 5) {
+              results.push({
+                allergen: text.substring(0, 100),
+                fullText: text.substring(0, 500)
+              });
+            }
+          }
+        }
+
+        // Sayfa içeriğini al (yapı farklıysa)
+        if (results.length === 0) {
+          const pageText = document.querySelector('.content-area, .main-content, #content, main, [role="main"]')?.textContent?.trim() || '';
+          if (pageText.length > 30) {
+            results.push({ allergen: 'Sayfa İçeriği', fullText: pageText.substring(0, 2000) });
+          }
+        }
+
+        return results;
+      });
+
+      await this.savePageDebug('allergies');
+
+      // DB'ye kaydet
+      const insert = db.prepare(
+        'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, data, source) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const a of allergies) {
+        if (a.allergen && a.allergen !== 'Sayfa İçeriği') {
+          insert.run(
+            this.patientId, new Date().toISOString().split('T')[0],
+            'allergy',
+            `Alerji - ${a.allergen.substring(0, 100)}`,
+            `Alerjen: ${a.allergen}${a.type ? ' | Tür: ' + a.type : ''}${a.severity ? ' | Şiddet: ' + a.severity : ''}${a.reaction ? ' | Reaksiyon: ' + a.reaction : ''}`,
+            JSON.stringify(a),
+            'enabiz'
+          );
+        }
+      }
+
+      console.log(`✅ ${allergies.length} alerji kaydedildi`);
+      return allergies;
+    } catch (e) {
+      console.error('❌ Alerji çekme hatası:', e.message);
+      await this.savePageDebug('error-allergies');
+      return [];
+    }
+  }
+
+  // Aşı kayıtlarını çek
+  async fetchVaccines() {
+    if (!this.isLoggedIn) throw new Error('Önce giriş yapın');
+    console.log('💉 Aşı kayıtları çekiliyor...');
+
+    const formatDate = (d) => {
+      if (!d) return new Date().toISOString().split('T')[0];
+      const m = d.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : d;
+    };
+
+    try {
+      const url = this.navLinks.vaccines || `${ENABIZ_URL}/Home/Asilarim`;
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      const vaccines = await this.page.evaluate(() => {
+        const results = [];
+
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            const texts = Array.from(cells).map(c => c.textContent?.trim() || '');
+            results.push({
+              name: texts[0] || '',
+              date: texts[1] || '',
+              dose: texts[2] || '',
+              institution: texts[3] || '',
+              fullText: row.textContent?.trim().substring(0, 500) || ''
+            });
+          }
+        }
+
+        if (results.length === 0) {
+          const cards = document.querySelectorAll('.card, .accordion-item, .list-group-item');
+          for (const card of cards) {
+            const text = card.textContent?.trim() || '';
+            if (text.length > 5) {
+              results.push({
+                name: text.substring(0, 100),
+                fullText: text.substring(0, 500)
+              });
+            }
+          }
+        }
+
+        return results;
+      });
+
+      await this.savePageDebug('vaccines');
+
+      const insert = db.prepare(
+        'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, data, source) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const v of vaccines) {
+        if (v.name) {
+          insert.run(
+            this.patientId, formatDate(v.date),
+            'vaccine',
+            `Aşı - ${v.name.substring(0, 100)}`,
+            `Aşı: ${v.name}${v.dose ? ' | Doz: ' + v.dose : ''}${v.institution ? ' | Kurum: ' + v.institution : ''}`,
+            JSON.stringify(v),
+            'enabiz'
+          );
+        }
+      }
+
+      console.log(`✅ ${vaccines.length} aşı kaydedildi`);
+      return vaccines;
+    } catch (e) {
+      console.error('❌ Aşı çekme hatası:', e.message);
+      await this.savePageDebug('error-vaccines');
+      return [];
+    }
+  }
+
+  // Kronik hastalıkları çek
+  async fetchChronicDiseases() {
+    if (!this.isLoggedIn) throw new Error('Önce giriş yapın');
+    console.log('🩺 Kronik hastalıklar çekiliyor...');
+
+    try {
+      const url = this.navLinks.chronic || `${ENABIZ_URL}/Home/KronikHastaliklarim`;
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      const diseases = await this.page.evaluate(() => {
+        const results = [];
+
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            const texts = Array.from(cells).map(c => c.textContent?.trim() || '');
+            results.push({
+              name: texts[0] || '',
+              icdCode: texts[1] || '',
+              startDate: texts[2] || '',
+              institution: texts[3] || '',
+              fullText: row.textContent?.trim().substring(0, 500) || ''
+            });
+          }
+        }
+
+        if (results.length === 0) {
+          const cards = document.querySelectorAll('.card, .accordion-item, .list-group-item');
+          for (const card of cards) {
+            const text = card.textContent?.trim() || '';
+            if (text.length > 5) {
+              results.push({
+                name: text.substring(0, 100),
+                fullText: text.substring(0, 500)
+              });
+            }
+          }
+        }
+
+        return results;
+      });
+
+      await this.savePageDebug('chronic-diseases');
+
+      const insert = db.prepare(
+        'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, data, source) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const d of diseases) {
+        if (d.name) {
+          insert.run(
+            this.patientId, new Date().toISOString().split('T')[0],
+            'chronic_disease',
+            `Kronik Hastalık - ${d.name.substring(0, 100)}`,
+            `Hastalık: ${d.name}${d.icdCode ? ' | ICD: ' + d.icdCode : ''}${d.startDate ? ' | Başlangıç: ' + d.startDate : ''}${d.institution ? ' | Kurum: ' + d.institution : ''}`,
+            JSON.stringify(d),
+            'enabiz'
+          );
+        }
+      }
+
+      console.log(`✅ ${diseases.length} kronik hastalık kaydedildi`);
+      return diseases;
+    } catch (e) {
+      console.error('❌ Kronik hastalık çekme hatası:', e.message);
+      await this.savePageDebug('error-chronic');
+      return [];
+    }
+  }
+
+  // Ameliyat kayıtlarını çek
+  async fetchSurgeries() {
+    if (!this.isLoggedIn) throw new Error('Önce giriş yapın');
+    console.log('🔪 Ameliyat kayıtları çekiliyor...');
+
+    const formatDate = (d) => {
+      if (!d) return new Date().toISOString().split('T')[0];
+      const m = d.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : d;
+    };
+
+    try {
+      const url = this.navLinks.surgeries || `${ENABIZ_URL}/Home/Ameliyatlarim`;
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      const surgeries = await this.page.evaluate(() => {
+        const results = [];
+
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            const texts = Array.from(cells).map(c => c.textContent?.trim() || '');
+            const detailBtn = row.querySelector('a[onclick], button[onclick]');
+            results.push({
+              name: texts[0] || '',
+              date: texts[1] || '',
+              hospital: texts[2] || '',
+              doctor: texts[3] || '',
+              detailOnclick: detailBtn?.getAttribute('onclick') || '',
+              fullText: row.textContent?.trim().substring(0, 500) || ''
+            });
+          }
+        }
+
+        if (results.length === 0) {
+          const cards = document.querySelectorAll('.card, .accordion-item, .list-group-item');
+          for (const card of cards) {
+            const text = card.textContent?.trim() || '';
+            if (text.length > 5) {
+              results.push({
+                name: text.substring(0, 100),
+                fullText: text.substring(0, 500)
+              });
+            }
+          }
+        }
+
+        return results;
+      });
+
+      await this.savePageDebug('surgeries');
+
+      const insert = db.prepare(
+        'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, data, source) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const s of surgeries) {
+        if (s.name) {
+          insert.run(
+            this.patientId, formatDate(s.date),
+            'surgery_record',
+            `Ameliyat - ${s.name.substring(0, 100)}`,
+            `Ameliyat: ${s.name}${s.hospital ? ' | Hastane: ' + s.hospital : ''}${s.doctor ? ' | Hekim: ' + s.doctor : ''}`,
+            JSON.stringify(s),
+            'enabiz'
+          );
+        }
+      }
+
+      console.log(`✅ ${surgeries.length} ameliyat kaydedildi`);
+      return surgeries;
+    } catch (e) {
+      console.error('❌ Ameliyat çekme hatası:', e.message);
+      await this.savePageDebug('error-surgeries');
+      return [];
+    }
+  }
+
+  // Tanı/ICD kodları çek
+  async fetchDiagnoses() {
+    if (!this.isLoggedIn) throw new Error('Önce giriş yapın');
+    console.log('🔍 Tanı/ICD kayıtları çekiliyor...');
+
+    const formatDate = (d) => {
+      if (!d) return new Date().toISOString().split('T')[0];
+      const m = d.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : d;
+    };
+
+    try {
+      const url = this.navLinks.diagnoses || `${ENABIZ_URL}/Home/Tanilarim`;
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await this.page.waitForTimeout(3000);
+
+      // Tarih filtresini en geniş aralığa ayarla
+      try {
+        const startYearSelect = this.page.locator('#baslangicyilSelect');
+        if (await startYearSelect.isVisible({ timeout: 3000 })) {
+          const options = await startYearSelect.locator('option[value]').allTextContents();
+          const years = options.map(y => y.trim()).filter(y => /^\d{4}/.test(y));
+          if (years.length > 0) {
+            await startYearSelect.selectOption(years[years.length - 1]);
+          }
+        }
+        const searchBtn = this.page.locator('.tarihFiltreBtn').first();
+        if (await searchBtn.isVisible({ timeout: 2000 })) {
+          await searchBtn.click();
+          await this.page.waitForTimeout(3000);
+        }
+      } catch (e) { /* filtre yok */ }
+
+      const diagnoses = await this.page.evaluate(() => {
+        const results = [];
+
+        const rows = document.querySelectorAll('table tbody tr');
+        for (const row of rows) {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) {
+            const texts = Array.from(cells).map(c => c.textContent?.trim() || '');
+            results.push({
+              icdCode: texts[0] || '',
+              name: texts[1] || '',
+              date: texts[2] || '',
+              hospital: texts[3] || '',
+              doctor: texts[4] || '',
+              type: texts[5] || '',
+              fullText: row.textContent?.trim().substring(0, 500) || ''
+            });
+          }
+        }
+
+        if (results.length === 0) {
+          const cards = document.querySelectorAll('.card, .accordion-item, .list-group-item');
+          for (const card of cards) {
+            const text = card.textContent?.trim() || '';
+            if (text.length > 5) {
+              results.push({
+                name: text.substring(0, 100),
+                fullText: text.substring(0, 500)
+              });
+            }
+          }
+        }
+
+        return results;
+      });
+
+      await this.savePageDebug('diagnoses');
+
+      const insert = db.prepare(
+        'INSERT INTO medical_events (patient_id, event_date, event_type, title, description, data, source) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const d of diagnoses) {
+        if (d.name || d.icdCode) {
+          insert.run(
+            this.patientId, formatDate(d.date),
+            'diagnosis',
+            `Tanı - ${(d.name || d.icdCode).substring(0, 100)}`,
+            `Tanı: ${d.name || ''}${d.icdCode ? ' | ICD: ' + d.icdCode : ''}${d.hospital ? ' | Hastane: ' + d.hospital : ''}${d.doctor ? ' | Hekim: ' + d.doctor : ''}${d.type ? ' | Tür: ' + d.type : ''}`,
+            JSON.stringify(d),
+            'enabiz'
+          );
+        }
+      }
+
+      console.log(`✅ ${diagnoses.length} tanı kaydedildi`);
+      return diagnoses;
+    } catch (e) {
+      console.error('❌ Tanı çekme hatası:', e.message);
+      await this.savePageDebug('error-diagnoses');
+      return [];
+    }
   }
 
   // Tarayıcıyı kapat

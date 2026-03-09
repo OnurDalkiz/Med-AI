@@ -219,51 +219,168 @@ async function validateKey(provider, apiKey, model) {
   }
 }
 
-// Hasta bağlamını oluştur
+// Hasta bağlamını oluştur (tüm E-Nabız verileri dahil)
 function buildPatientContext(patientId) {
   const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(patientId);
   if (!patient) return '';
 
+  // Tüm tıbbi olayları event_type bazında ayır (son 50)
   const events = db.prepare(
-    'SELECT * FROM medical_events WHERE patient_id = ? ORDER BY event_date DESC LIMIT 20'
+    'SELECT * FROM medical_events WHERE patient_id = ? ORDER BY event_date DESC LIMIT 50'
   ).all(patientId);
 
   const labs = db.prepare(
-    'SELECT * FROM lab_results WHERE patient_id = ? ORDER BY test_date DESC LIMIT 30'
+    'SELECT * FROM lab_results WHERE patient_id = ? ORDER BY test_date DESC LIMIT 50'
   ).all(patientId);
 
   const meds = db.prepare(
     'SELECT * FROM medications WHERE patient_id = ? AND active = 1'
   ).all(patientId);
 
+  // Event'leri kategorilere ayır
+  const categorized = {};
+  for (const e of events) {
+    const type = e.event_type || 'other';
+    if (!categorized[type]) categorized[type] = [];
+    categorized[type].push(e);
+  }
+
   let context = `
 ## Hasta Bilgileri
 - Ad: ${patient.name}
 - Cinsiyet: ${patient.gender || 'Belirtilmemiş'}
+- Doğum Tarihi: ${patient.birth_date || 'Belirtilmemiş'}
+- TC: ${patient.tc_no ? '***' : 'Belirtilmemiş'}
 - Teşhis: ${patient.diagnosis || 'Belirtilmemiş'}
 - Teşhis Tarihi: ${patient.diagnosis_date || 'Belirtilmemiş'}
 - Notlar: ${patient.notes || 'Yok'}
 `;
 
-  if (events.length > 0) {
-    context += '\n## Son Tıbbi Olaylar\n';
-    for (const e of events) {
+  // Tanılar / ICD kodları
+  if (categorized.diagnosis?.length > 0) {
+    context += '\n## Tanılar / ICD Kodları\n';
+    for (const e of categorized.diagnosis) {
+      context += `- [${e.event_date}] ${e.title}: ${e.description || ''}\n`;
+    }
+  }
+
+  // Kronik hastalıklar
+  if (categorized.chronic_disease?.length > 0) {
+    context += '\n## Kronik Hastalıklar\n';
+    for (const e of categorized.chronic_disease) {
+      context += `- ${e.title}: ${e.description || ''}\n`;
+    }
+  }
+
+  // Alerjiler
+  if (categorized.allergy?.length > 0) {
+    context += '\n## Alerjiler\n';
+    for (const e of categorized.allergy) {
+      context += `- ${e.title}: ${e.description || ''}\n`;
+    }
+  }
+
+  // Ameliyatlar
+  if (categorized.surgery_record?.length > 0) {
+    context += '\n## Ameliyat Geçmişi\n';
+    for (const e of categorized.surgery_record) {
+      context += `- [${e.event_date}] ${e.title}: ${e.description || ''}\n`;
+    }
+  }
+
+  // Aşılar
+  if (categorized.vaccine?.length > 0) {
+    context += '\n## Aşı Kayıtları\n';
+    for (const e of categorized.vaccine) {
+      context += `- [${e.event_date}] ${e.title}\n`;
+    }
+  }
+
+  // Reçeteler
+  if (categorized.prescription?.length > 0) {
+    context += '\n## Son Reçeteler\n';
+    for (const e of categorized.prescription.slice(0, 10)) {
+      context += `- [${e.event_date}] ${e.title}`;
+      if (e.data) {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.medications?.length) {
+            context += ': ' + d.medications.map(m => m.name || m.drug).join(', ');
+          }
+        } catch (_) {}
+      }
+      context += '\n';
+    }
+  }
+
+  // Radyoloji
+  if (categorized.radiology?.length > 0) {
+    context += '\n## Radyoloji Sonuçları\n';
+    for (const e of categorized.radiology.slice(0, 10)) {
+      context += `- [${e.event_date}] ${e.title}: ${(e.description || '').substring(0, 300)}\n`;
+    }
+  }
+
+  // Epikriz
+  if (categorized.epicrisis?.length > 0) {
+    context += '\n## Epikriz Kayıtları\n';
+    for (const e of categorized.epicrisis.slice(0, 5)) {
+      context += `- [${e.event_date}] ${e.title}: ${(e.description || '').substring(0, 500)}\n`;
+    }
+  }
+
+  // Muayene / Randevular
+  if (categorized.appointment?.length > 0) {
+    context += '\n## Son Muayeneler/Randevular\n';
+    for (const e of categorized.appointment.slice(0, 10)) {
+      context += `- [${e.event_date}] ${e.title}: ${e.description || ''}\n`;
+    }
+  }
+
+  // Raporlar
+  if (categorized.report?.length > 0) {
+    context += '\n## Tıbbi Raporlar\n';
+    for (const e of categorized.report.slice(0, 5)) {
+      context += `- [${e.event_date}] ${e.title}: ${(e.description || '').substring(0, 300)}\n`;
+    }
+  }
+
+  // Diğer olaylar (note, symptom, surgery, medication_change vb.)
+  const shownTypes = ['diagnosis', 'chronic_disease', 'allergy', 'surgery_record', 'vaccine', 'prescription', 'radiology', 'epicrisis', 'appointment', 'report', 'note'];
+  const otherEvents = events.filter(e => !shownTypes.includes(e.event_type));
+  if (otherEvents.length > 0) {
+    context += '\n## Diğer Tıbbi Olaylar\n';
+    for (const e of otherEvents.slice(0, 10)) {
       context += `- [${e.event_date}] ${e.event_type}: ${e.title} - ${e.description || ''}\n`;
     }
   }
 
+  // Tahlil sonuçları
   if (labs.length > 0) {
-    context += '\n## Son Tahlil Sonuçları\n';
-    for (const l of labs) {
-      const flag = l.is_abnormal ? ' ⚠️ ANORMAL' : '';
-      context += `- [${l.test_date}] ${l.test_name}: ${l.test_value} ${l.unit || ''} (Ref: ${l.reference_range || 'N/A'})${flag}\n`;
+    // Anormal sonuçları üste al
+    const abnormal = labs.filter(l => l.is_abnormal);
+    const normal = labs.filter(l => !l.is_abnormal);
+
+    if (abnormal.length > 0) {
+      context += '\n## ⚠️ ANORMAL Tahlil Sonuçları\n';
+      for (const l of abnormal) {
+        context += `- [${l.test_date}] ${l.test_name}: ${l.test_value} ${l.unit || ''} (Ref: ${l.reference_range || 'N/A'}) ⚠️ ANORMAL\n`;
+      }
+    }
+
+    if (normal.length > 0) {
+      context += '\n## Normal Tahlil Sonuçları\n';
+      for (const l of normal.slice(0, 20)) {
+        context += `- [${l.test_date}] ${l.test_name}: ${l.test_value} ${l.unit || ''} (Ref: ${l.reference_range || 'N/A'})\n`;
+      }
     }
   }
 
+  // Aktif ilaçlar
   if (meds.length > 0) {
     context += '\n## Aktif İlaçlar\n';
     for (const m of meds) {
-      context += `- ${m.name} ${m.dosage || ''} - ${m.frequency || ''}\n`;
+      context += `- ${m.name} ${m.dosage || ''} - ${m.frequency || ''}${m.prescribed_by ? ' (Yazan: ' + m.prescribed_by + ')' : ''}\n`;
     }
   }
 
