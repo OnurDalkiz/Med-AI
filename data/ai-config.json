@@ -1,0 +1,5 @@
+{
+  "provider": "google",
+  "model": "gemini-3-flash-preview",
+  "apiKey": "AIzaSyDaLyoACen0AUglozm3MvuM19z_YweDEEw"
+}

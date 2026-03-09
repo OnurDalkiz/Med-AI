@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedAI Doktor Bot 🩺</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242834;
+      --border: #2d3348;
+      --primary: #4f8cff;
+      --primary-hover: #6ba0ff;
+      --danger: #ff5c5c;
+      --success: #4caf50;
+      --warning: #ffb74d;
+      --text: #e4e6f0;
+      --text-dim: #8890a8;
+      --user-msg: #1e3a5f;
+      --bot-msg: #1a2436;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-icon { font-size: 28px; }
+    .header-info h1 { font-size: 18px; font-weight: 600; }
+    .header-info p { font-size: 12px; color: var(--text-dim); }
+    .header-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--success);
+    }
+    .header-status::before {
+      content: '';
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+    }
+
+    /* Layout */
+    .main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    .patient-card {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .patient-card .name { font-weight: 600; font-size: 15px; }
+    .patient-card .diagnosis {
+      color: var(--warning);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .stat-item {
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 8px;
+      text-align: center;
+    }
+    .stat-item .num { font-size: 20px; font-weight: 700; color: var(--primary); }
+    .stat-item .label { font-size: 10px; color: var(--text-dim); }
+
+    .nav-btn {
+      width: 100%;
+      padding: 10px 12px;
+      background: none;
+      border: none;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .nav-btn:hover { background: var(--surface2); }
+    .nav-btn.active { background: var(--primary); color: white; }
+
+    /* Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: var(--user-msg);
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--bot-msg);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .message .time {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+    .message.system {
+      align-self: center;
+      background: var(--surface2);
+      color: var(--text-dim);
+      font-size: 12px;
+      max-width: 90%;
+      text-align: center;
+    }
+    .typing {
+      align-self: flex-start;
+      color: var(--text-dim);
+      font-size: 13px;
+      padding: 8px 16px;
+    }
+    .typing::after {
+      content: '...';
+      animation: dots 1.5s infinite;
+    }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    /* Input */
+    .input-area {
+      padding: 16px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .input-area textarea {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 14px;
+      resize: none;
+      font-family: inherit;
+      line-height: 1.5;
+      max-height: 120px;
+    }
+    .input-area textarea:focus { outline: none; border-color: var(--primary); }
+    .input-area textarea::placeholder { color: var(--text-dim); }
+    .send-btn {
+      background: var(--primary);
+      border: none;
+      border-radius: 10px;
+      padding: 0 20px;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: var(--primary-hover); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Events Panel */
+    .panel { display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 20px; }
+    .panel.active { display: flex; }
+    .event-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .event-card .event-date { font-size: 11px; color: var(--primary); }
+    .event-card .event-type {
+      font-size: 10px; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 4px;
+      background: var(--border); color: var(--text-dim);
+      display: inline-block; margin-left: 8px;
+    }
+    .event-card .event-title { font-weight: 600; margin: 6px 0 4px; }
+    .event-card .event-desc { color: var(--text-dim); font-size: 13px; }
+
+    /* Upload */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .upload-zone:hover { border-color: var(--primary); }
+    .upload-zone.dragover { border-color: var(--primary); background: rgba(79,140,255,0.05); }
+    .upload-icon { font-size: 48px; margin-bottom: 12px; }
+    .upload-text { color: var(--text-dim); font-size: 14px; }
+
+    /* Quick actions */
+    .quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 20px 16px;
+    }
+    .quick-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .quick-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Setup Overlay */
+    .setup-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,17,23,0.95);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+    .setup-overlay.hidden { display: none; }
+    .setup-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      max-width: 560px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .setup-card h2 { font-size: 22px; margin-bottom: 6px; }
+    .setup-card .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 24px; }
+    .setup-card label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; margin-top: 16px; }
+    .setup-card select, .setup-card input[type="password"], .setup-card input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .setup-card select:focus, .setup-card input:focus { outline: none; border-color: var(--primary); }
+    .setup-card select option { background: var(--surface2); }
+    .setup-model-desc { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .setup-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 24px;
+      transition: background 0.2s;
+    }
+    .setup-btn:hover { background: var(--primary-hover); }
+    .setup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .setup-error { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+    .setup-success { color: var(--success); font-size: 12px; margin-top: 8px; display: none; }
+    .setup-provider-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .provider-card {
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .provider-card:hover { border-color: var(--primary); }
+    .provider-card.selected { border-color: var(--primary); background: rgba(79,140,255,0.1); }
+    .provider-card .provider-icon { font-size: 28px; margin-bottom: 6px; }
+    .provider-card .provider-name { font-size: 13px; font-weight: 600; }
+    .provider-card .provider-sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+    .key-help-link { font-size: 11px; color: var(--primary); text-decoration: none; margin-top: 4px; display: inline-block; }
+    .key-help-link:hover { text-decoration: underline; }
+    .setup-step { display: none; }
+    .setup-step.active { display: block; }
+    .setup-dots { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
+    .setup-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .setup-dot.active { background: var(--primary); }
+    .setup-current-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .setup-current-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+    /* E-Nabız */
+    .enabiz-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .enabiz-card h3 { font-size: 14px; margin-bottom: 8px; }
+    .enabiz-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: var(--bg);
+    }
+    .enabiz-status.connected { color: var(--success); }
+    .enabiz-status.idle { color: var(--text-dim); }
+    .enabiz-status.syncing { color: var(--warning); }
+    .enabiz-status.error { color: var(--danger); }
+    .enabiz-btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .enabiz-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .enabiz-btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+    .enabiz-btn.primary:hover { background: var(--primary-hover); }
+    .enabiz-btn.danger { border-color: var(--danger); color: var(--danger); }
+    .enabiz-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .enabiz-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .enabiz-log {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    .enabiz-log .log-line { margin-bottom: 4px; }
+    .enabiz-log .log-success { color: var(--success); }
+    .enabiz-log .log-error { color: var(--danger); }
+    .enabiz-log .log-info { color: var(--primary); }
+
+    /* Calendar */
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .calendar-header h3 { font-size: 16px; margin: 0; }
+    .calendar-nav {
+      display: flex;
+      gap: 8px;
+    }
+    .calendar-nav button {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .calendar-nav button:hover { border-color: var(--primary); color: var(--primary); }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+    .calendar-grid .cal-head {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      padding: 8px 0;
+    }
+    .calendar-grid .cal-day {
+      background: var(--surface2);
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 6px;
+      min-height: 60px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .calendar-grid .cal-day:hover { border-color: var(--primary); }
+    .calendar-grid .cal-day.today { border-color: var(--primary); background: rgba(79,140,255,0.08); }
+    .calendar-grid .cal-day.other-month { opacity: 0.3; }
+    .calendar-grid .cal-day.has-events::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 3px;
+    }
+    .cal-day-num { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+    .cal-day-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+    .cal-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .cal-dot.event { background: var(--primary); }
+    .cal-dot.lab { background: var(--success); }
+    .cal-dot.med { background: var(--warning); }
+    .cal-dot.reminder { background: #e879f9; }
+    .cal-dot.abnormal { background: var(--danger); }
+    .cal-day-detail {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .cal-day-detail h4 { margin: 0 0 12px; font-size: 14px; }
+    .cal-detail-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .cal-detail-item:last-child { border-bottom: none; }
+    .cal-detail-icon { flex-shrink: 0; }
+    .cal-detail-title { font-weight: 600; }
+    .cal-detail-desc { color: var(--text-dim); font-size: 12px; }
+
+    /* Reminders */
+    .reminder-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .reminder-card .reminder-icon { font-size: 20px; flex-shrink: 0; }
+    .reminder-card .reminder-info { flex: 1; min-width: 0; }
+    .reminder-card .reminder-title { font-weight: 600; font-size: 13px; }
+    .reminder-card .reminder-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .reminder-card .reminder-actions { display: flex; gap: 4px; }
+    .reminder-card .reminder-actions button {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .reminder-card .reminder-actions button:hover { color: var(--primary); }
+    .reminder-card .reminder-actions button.del:hover { color: var(--danger); }
+    .reminder-form {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .reminder-form h3 { margin: 0 0 12px; font-size: 14px; }
+    .reminder-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .reminder-form-grid label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+    .reminder-form-grid input,
+    .reminder-form-grid select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .reminder-form-grid input:focus,
+    .reminder-form-grid select:focus { outline: none; border-color: var(--primary); }
+    .reminder-form-grid .full { grid-column: 1 / -1; }
+    .reminder-form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      justify-content: flex-end;
+    }
+
+    /* Patient Tabs */
+    .patient-tab {
+      background: var(--surface2);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .patient-tab:hover { border-color: var(--border); }
+    .patient-tab.active { border-color: var(--primary); background: rgba(79,140,255,0.1); }
+    .patient-tab .pt-info { flex: 1; min-width: 0; }
+    .patient-tab .pt-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .patient-tab .pt-diagnosis { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .patient-tab .pt-edit {
+      background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px;
+      opacity: 0; transition: opacity 0.2s; flex-shrink: 0;
+    }
+    .patient-tab:hover .pt-edit { opacity: 1; }
+    .patient-tab .pt-edit:hover { color: var(--primary); }
+    .add-patient-btn {
+      width: 100%;
+      padding: 8px;
+      background: none;
+      border: 1px dashed var(--border);
+      color: var(--text-dim);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      margin-top: 4px;
+    }
+    .add-patient-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Patient Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,17,23,0.85);
+      z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal-card h2 { font-size: 18px; margin-bottom: 16px; }
+    .modal-card label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; margin-top: 12px; color: var(--text-dim); }
+    .modal-card input, .modal-card select, .modal-card textarea {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .modal-card input:focus, .modal-card select:focus, .modal-card textarea:focus { outline: none; border-color: var(--primary); }
+    .modal-card select option { background: var(--surface2); }
+    .modal-card textarea { resize: vertical; min-height: 60px; }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .modal-btn {
+      padding: 8px 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .modal-btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+    .modal-btn.primary:hover { background: var(--primary-hover); }
+    .modal-btn.danger { border-color: var(--danger); color: var(--danger); background: none; }
+    .modal-btn.danger:hover { background: rgba(255,92,92,0.1); }
+    .modal-spacer { flex: 1; }
+  </style>
+</head>
+<body>
+  <!-- Setup Overlay -->
+  <div class="setup-overlay hidden" id="setupOverlay">
+    <div class="setup-card">
+      <div id="setupCurrentBadge" class="setup-current-badge" style="display:none">
+        <span class="dot"></span>
+        <span id="setupCurrentInfo"></span>
+        <a href="#" style="margin-left:auto;color:var(--text-dim);font-size:11px" onclick="closeSetup()">Kapat ✕</a>
+      </div>
+
+      <h2>🩺 MedAI Kurulumu</h2>
+      <p class="subtitle">Doktor Bot'un çalışması için bir AI dil modeli seçin ve API key girin.</p>
+
+      <!-- Step 1: Provider -->
+      <div class="setup-step active" id="setupStep1">
+        <label>1. AI Sağlayıcı Seçin</label>
+        <div class="setup-provider-cards" id="providerCards"></div>
+      </div>
+
+      <!-- Step 2: Model + Key -->
+      <div class="setup-step" id="setupStep2">
+        <label>2. Model Seçin</label>
+        <select id="setupModel" onchange="updateModelDesc()"></select>
+        <div class="setup-model-desc" id="modelDesc"></div>
+
+        <input type="text" id="setupCustomModel" placeholder="Örn: claude-opus-4.6-20260201, gemini-3.0-pro" style="display:none;margin-top:8px;width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px">
+        <div id="customModelHint" style="display:none;font-size:11px;color:var(--text-dim);margin-top:4px">API'nin kabul ettiği tam model ID'sini girin</div>
+
+        <label>3. API Key Girin</label>
+        <input type="password" id="setupApiKey" placeholder="" autocomplete="off">
+        <a class="key-help-link" id="keyDocsLink" href="#" target="_blank" rel="noopener noreferrer">📘 API Key nereden alınır?</a>
+
+        <div class="setup-error" id="setupError"></div>
+        <div class="setup-success" id="setupSuccess"></div>
+
+        <button class="setup-btn" id="setupSaveBtn" onclick="saveSetup()">
+          ✓ Doğrula ve Kaydet
+        </button>
+        <p style="text-align:center;margin-top:10px">
+          <a href="#" style="color:var(--text-dim);font-size:12px" onclick="showStep(1)">← Sağlayıcı değiştir</a>
+        </p>
+      </div>
+
+      <div class="setup-dots">
+        <div class="setup-dot active" id="dot1"></div>
+        <div class="setup-dot" id="dot2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patient Modal -->
+  <div class="modal-overlay hidden" id="patientModal">
+    <div class="modal-card">
+      <h2 id="patientModalTitle">Yeni Hasta Ekle</h2>
+      <input type="hidden" id="pmPatientId" value="">
+      <label>Ad Soyad *</label>
+      <input type="text" id="pmName" placeholder="Hasta adı soyadı">
+      <label>Cinsiyet</label>
+      <select id="pmGender">
+        <option value="Erkek">Erkek</option>
+        <option value="Kadın">Kadın</option>
+      </select>
+      <label>Tanı</label>
+      <input type="text" id="pmDiagnosis" placeholder="Örn: Pankreas Kanseri, KOAH">
+      <label>Tanı Tarihi</label>
+      <input type="date" id="pmDiagnosisDate">
+      <label>TC Kimlik No (E-Nabız için)</label>
+      <input type="text" id="pmTcNo" placeholder="11 haneli TC kimlik numarası" maxlength="11">
+      <label>Notlar</label>
+      <textarea id="pmNotes" placeholder="Ek notlar..."></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn danger" id="pmDeleteBtn" onclick="deletePatient()" style="display:none">Sil</button>
+        <div class="modal-spacer"></div>
+        <button class="modal-btn" onclick="closePatientModal()">İptal</button>
+        <button class="modal-btn primary" onclick="savePatient()">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="header">
+    <span class="header-icon">🩺</span>
+    <div class="header-info">
+      <h1>MedAI Doktor Bot</h1>
+      <p id="headerSubtitle">Hasta seçin veya yeni hasta ekleyin</p>
+    </div>
+    <div class="header-status">Aktif</div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <h3>Hastalar</h3>
+        <div id="patientList"></div>
+        <button class="add-patient-btn" onclick="openPatientModal()">+ Hasta Ekle</button>
+      </div>
+
+      <div class="sidebar-section" id="selectedPatientSection" style="display:none">
+        <h3>Seçili Hasta</h3>
+        <div class="patient-card">
+          <div class="name" id="patientName">Yükleniyor...</div>
+          <div class="diagnosis" id="patientDiagnosis"></div>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <div class="num" id="statEvents">-</div>
+              <div class="label">Tıbbi Olay</div>
+            </div>
+            <div class="stat-item">
+              <div class="num" id="statLabs">-</div>
+              <div class="label">Tahlil</div>
+            </div>
+            <div class="stat-item">
+              <div class="num" id="statMeds">-</div>
+              <div class="label">İlaç</div>
+            </div>
+            <div class="stat-item">
+              <div class="num" id="statDays">-</div>
+              <div class="label">Gün</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Menü</h3>
+        <button class="nav-btn active" data-panel="chat">💬 Doktor Chat</button>
+        <button class="nav-btn" data-panel="timeline">📋 Zaman Çizelgesi</button>
+        <button class="nav-btn" data-panel="calendar">📅 Takvim</button>
+        <button class="nav-btn" data-panel="reminders">🔔 Hatırlatıcılar</button>
+        <button class="nav-btn" data-panel="upload">📁 Dosya Yükle</button>
+        <button class="nav-btn" data-panel="enabiz">🏥 E-Nabız</button>
+        <button class="nav-btn" onclick="openSetup()" style="margin-top:8px;color:var(--text-dim)">⚙️ AI Ayarları</button>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="chat-area panel active" id="panel-chat">
+      <div class="messages" id="messages">
+        <div class="message system">
+          🩺 MedAI Doktor Bot'a hoş geldiniz. Sağlık verilerinizi takip ediyoruz.<br>
+          ⚠️ Bu bot tıbbi bilgilendirme amaçlıdır, doktor yerine geçmez.
+        </div>
+      </div>
+      <div class="quick-actions">
+        <button class="quick-btn" onclick="sendQuick('Hastanın son durumu nedir?')">📊 Son Durum</button>
+        <button class="quick-btn" onclick="sendQuick('Son tahlil sonuçlarını değerlendir')">🔬 Tahlil Yorumu</button>
+        <button class="quick-btn" onclick="sendQuick('Beslenme önerileri neler?')">🍎 Beslenme</button>
+        <button class="quick-btn" onclick="sendQuick('Doktora sormamız gereken sorular neler?')">❓ Doktora Sorular</button>
+        <button class="quick-btn" onclick="sendQuick('Tedavi sürecinde dikkat edilmesi gerekenler')">⚕️ Genel Bakım</button>
+      </div>
+      <div class="input-area">
+        <textarea id="chatInput" rows="1" placeholder="Sorunuzu yazın..." onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+
+    <!-- Timeline Panel -->
+    <div class="panel" id="panel-timeline">
+      <h2 style="margin-bottom:16px">📋 Tıbbi Zaman Çizelgesi</h2>
+      <div id="timelineList"></div>
+    </div>
+
+    <!-- Upload Panel -->
+    <div class="panel" id="panel-upload">
+      <h2 style="margin-bottom:16px">📁 Dosya Yükle</h2>
+      <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">
+          Tahlil sonucu, reçete veya tıbbi rapor yükleyin<br>
+          <small>PDF, JPEG, PNG, Excel - Max 50MB</small>
+        </div>
+      </div>
+      <input type="file" id="fileInput" hidden accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.txt,.json"
+             onchange="uploadFile(this.files[0])">
+      <div id="uploadedFiles" style="margin-top:20px"></div>
+    </div>
+
+    <!-- Calendar Panel -->
+    <div class="panel" id="panel-calendar">
+      <div class="calendar-header">
+        <div class="calendar-nav">
+          <button onclick="calNavMonth(-1)">◀ Önceki</button>
+        </div>
+        <h3 id="calMonthTitle">Ocak 2025</h3>
+        <div class="calendar-nav">
+          <button onclick="calNavMonth(1)">Sonraki ▶</button>
+        </div>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div id="calDayDetail" style="display:none"></div>
+    </div>
+
+    <!-- Reminders Panel -->
+    <div class="panel" id="panel-reminders">
+      <h2 style="margin-bottom:16px">🔔 Hatırlatıcılar & Randevular</h2>
+
+      <div class="reminder-form" id="reminderForm">
+        <h3 id="reminderFormTitle">Yeni Hatırlatıcı</h3>
+        <input type="hidden" id="rfId" value="">
+        <div class="reminder-form-grid">
+          <div class="full">
+            <label>Başlık *</label>
+            <input type="text" id="rfTitle" placeholder="Örn: Dr. Mehmet randevusu">
+          </div>
+          <div>
+            <label>Tür</label>
+            <select id="rfType">
+              <option value="appointment">📅 Randevu</option>
+              <option value="medication">💊 İlaç Hatırlatma</option>
+              <option value="checkup">🔬 Kontrol</option>
+              <option value="custom">📌 Genel</option>
+            </select>
+          </div>
+          <div>
+            <label>Tekrar</label>
+            <select id="rfRepeat">
+              <option value="none">Tekrar etme</option>
+              <option value="daily">Her gün</option>
+              <option value="weekly">Her hafta</option>
+              <option value="monthly">Her ay</option>
+            </select>
+          </div>
+          <div>
+            <label>Tarih *</label>
+            <input type="date" id="rfDate">
+          </div>
+          <div>
+            <label>Saat *</label>
+            <input type="time" id="rfTime" value="09:00">
+          </div>
+          <div class="full">
+            <label>Açıklama</label>
+            <input type="text" id="rfDesc" placeholder="Ek detaylar...">
+          </div>
+        </div>
+        <div class="reminder-form-actions">
+          <button class="modal-btn" onclick="resetReminderForm()">Temizle</button>
+          <button class="modal-btn primary" onclick="saveReminder()">Kaydet</button>
+        </div>
+      </div>
+
+      <div id="remindersList"></div>
+    </div>
+
+    <!-- E-Nabız Panel -->
+    <div class="panel" id="panel-enabiz">
+      <h2 style="margin-bottom:16px">🏥 E-Nabız Entegrasyonu</h2>
+
+      <div class="enabiz-card">
+        <h3>Bağlantı Durumu</h3>
+        <span class="enabiz-status idle" id="enabizStatusBadge">● Bağlı değil</span>
+        <span id="enabizLastSync" style="margin-left:12px;font-size:11px;color:var(--text-dim)"></span>
+        <div class="enabiz-actions">
+          <button class="enabiz-btn primary" id="btnManualLogin" onclick="enabizManualLogin()">🔐 Manuel Giriş</button>
+          <button class="enabiz-btn" id="btnAutoLogin" onclick="enabizAutoLogin()">⚡ Otomatik Giriş</button>
+          <button class="enabiz-btn danger" id="btnDisconnect" onclick="enabizDisconnect()" style="display:none">⏏ Bağlantıyı Kes</button>
+        </div>
+      </div>
+
+      <div class="enabiz-card">
+        <h3>Veri Çekme</h3>
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px">E-Nabız'dan sağlık verilerinizi çekin ve veritabanına kaydedin.</p>
+        <div class="enabiz-actions">
+          <button class="enabiz-btn" onclick="enabizFetch('all')" id="btnFetchAll">🔄 Tümünü Çek</button>
+          <button class="enabiz-btn" onclick="enabizFetch('labs')">🔬 Tahliller</button>
+          <button class="enabiz-btn" onclick="enabizFetch('prescriptions')">💊 Reçeteler</button>
+          <button class="enabiz-btn" onclick="enabizFetch('visits')">🏥 Muayeneler</button>
+          <button class="enabiz-btn" onclick="enabizFetch('radiology')">📷 Radyoloji</button>
+        </div>
+      </div>
+
+      <div class="enabiz-card">
+        <h3>İşlem Günlüğü</h3>
+        <div class="enabiz-log" id="enabizLog">
+          <div class="log-line log-info">Sistem hazır. E-Nabız'a bağlanmak için yukarıdaki butonları kullanın.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPatientId = null;
+    let allPatients = [];
+    const API = '/api';
+
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+        if (btn.dataset.panel === 'timeline') loadTimeline();
+        if (btn.dataset.panel === 'upload') loadFiles();
+        if (btn.dataset.panel === 'enabiz') enabizCheckStatus();
+        if (btn.dataset.panel === 'calendar') loadCalendar();
+        if (btn.dataset.panel === 'reminders') loadReminders();
+      });
+    });
+
+    // ========== PATIENT MANAGEMENT ==========
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text || '';
+      return div.innerHTML;
+    }
+
+    function renderPatientList() {
+      const container = document.getElementById('patientList');
+      container.innerHTML = '';
+      for (const p of allPatients) {
+        const tab = document.createElement('div');
+        tab.className = `patient-tab${p.id === currentPatientId ? ' active' : ''}`;
+        tab.onclick = () => switchPatient(p.id);
+        tab.innerHTML = `
+          <div class="pt-info">
+            <div class="pt-name">${escapeHtml(p.name)}</div>
+            <div class="pt-diagnosis">${escapeHtml(p.diagnosis || 'Tanı belirtilmemiş')}</div>
+          </div>
+          <button class="pt-edit" onclick="event.stopPropagation(); openPatientModal(${p.id})" title="Düzenle">✏️</button>
+        `;
+        container.appendChild(tab);
+      }
+    }
+
+    async function loadPatients() {
+      try {
+        const res = await fetch(`${API}/patients`);
+        allPatients = await res.json();
+        renderPatientList();
+        return allPatients;
+      } catch (e) {
+        console.error('Patients load error:', e);
+        return [];
+      }
+    }
+
+    async function switchPatient(id) {
+      currentPatientId = id;
+      renderPatientList();
+
+      // Clear chat messages
+      const messagesEl = document.getElementById('messages');
+      messagesEl.innerHTML = `<div class="message system">
+        🩺 Hasta verilerini yüklüyorum...<br>
+        ⚠️ Bu bot tıbbi bilgilendirme amaçlıdır, doktor yerine geçmez.
+      </div>`;
+
+      // Clear E-Nabız log
+      document.getElementById('enabizLog').innerHTML = '<div class="log-line log-info">Sistem hazır. E-Nabız\'a bağlanmak için yukarıdaki butonları kullanın.</div>';
+
+      document.getElementById('selectedPatientSection').style.display = '';
+      await loadSummary();
+      await loadChatHistory();
+      enabizCheckStatus();
+    }
+
+    function openPatientModal(id) {
+      const modal = document.getElementById('patientModal');
+      const title = document.getElementById('patientModalTitle');
+      const deleteBtn = document.getElementById('pmDeleteBtn');
+
+      if (id) {
+        const patient = allPatients.find(p => p.id === id);
+        if (!patient) return;
+        title.textContent = 'Hasta Düzenle';
+        document.getElementById('pmPatientId').value = id;
+        document.getElementById('pmName').value = patient.name || '';
+        document.getElementById('pmGender').value = patient.gender || 'Erkek';
+        document.getElementById('pmDiagnosis').value = patient.diagnosis || '';
+        document.getElementById('pmDiagnosisDate').value = patient.diagnosis_date || '';
+        document.getElementById('pmTcNo').value = patient.tc_no || '';
+        document.getElementById('pmNotes').value = patient.notes || '';
+        deleteBtn.style.display = '';
+      } else {
+        title.textContent = 'Yeni Hasta Ekle';
+        document.getElementById('pmPatientId').value = '';
+        document.getElementById('pmName').value = '';
+        document.getElementById('pmGender').value = 'Erkek';
+        document.getElementById('pmDiagnosis').value = '';
+        document.getElementById('pmDiagnosisDate').value = '';
+        document.getElementById('pmTcNo').value = '';
+        document.getElementById('pmNotes').value = '';
+        deleteBtn.style.display = 'none';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closePatientModal() {
+      document.getElementById('patientModal').classList.add('hidden');
+    }
+
+    async function savePatient() {
+      const id = document.getElementById('pmPatientId').value;
+      const name = document.getElementById('pmName').value.trim();
+      if (!name) return alert('Ad Soyad zorunludur.');
+
+      const body = {
+        name,
+        gender: document.getElementById('pmGender').value,
+        diagnosis: document.getElementById('pmDiagnosis').value.trim(),
+        diagnosisDate: document.getElementById('pmDiagnosisDate').value,
+        tcNo: document.getElementById('pmTcNo').value.trim(),
+        notes: document.getElementById('pmNotes').value.trim()
+      };
+
+      try {
+        const url = id ? `${API}/patients/${id}` : `${API}/patients`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.error) return alert('Hata: ' + data.error);
+
+        closePatientModal();
+        await loadPatients();
+
+        if (!id && data.id) {
+          await switchPatient(data.id);
+        } else if (id) {
+          await loadSummary();
+        }
+      } catch (e) {
+        alert('Hata: ' + e.message);
+      }
+    }
+
+    async function deletePatient() {
+      const id = document.getElementById('pmPatientId').value;
+      if (!id) return;
+      if (!confirm('Bu hastayı ve tüm verilerini silmek istediğinize emin misiniz?')) return;
+
+      try {
+        const res = await fetch(`${API}/patients/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) return alert('Hata: ' + data.error);
+
+        closePatientModal();
+        if (parseInt(id) === currentPatientId) {
+          currentPatientId = null;
+          document.getElementById('selectedPatientSection').style.display = 'none';
+          document.getElementById('headerSubtitle').textContent = 'Hasta seçin veya yeni hasta ekleyin';
+        }
+        const patients = await loadPatients();
+        if (!currentPatientId && patients.length > 0) {
+          await switchPatient(patients[0].id);
+        }
+      } catch (e) {
+        alert('Hata: ' + e.message);
+      }
+    }
+
+    // Load patient summary
+    async function loadSummary() {
+      if (!currentPatientId) return;
+      try {
+        const res = await fetch(`${API}/patient/${currentPatientId}/summary`);
+        const data = await res.json();
+        document.getElementById('patientName').textContent = data.patient.name;
+        document.getElementById('patientDiagnosis').textContent = data.patient.diagnosis;
+        document.getElementById('statEvents').textContent = data.stats.eventCount;
+        document.getElementById('statLabs').textContent = data.stats.labCount;
+        document.getElementById('statMeds').textContent = data.stats.medCount;
+        document.getElementById('headerSubtitle').textContent = `${data.patient.name} - ${data.patient.diagnosis || 'Takip Asistanı'}`;
+
+        const diagDate = new Date(data.patient.diagnosis_date);
+        const days = Math.floor((Date.now() - diagDate) / (1000 * 60 * 60 * 24));
+        document.getElementById('statDays').textContent = days > 0 ? days : '-';
+      } catch (e) { console.error('Summary load error:', e); }
+    }
+
+    // Chat
+    async function sendMessage() {
+      if (!currentPatientId) return alert('Lütfen önce bir hasta seçin.');
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+      addMessage('user', msg);
+
+      const typing = document.createElement('div');
+      typing.className = 'typing';
+      typing.textContent = 'Doktor Bot düşünüyor';
+      document.getElementById('messages').appendChild(typing);
+      scrollToBottom();
+
+      document.getElementById('sendBtn').disabled = true;
+
+      try {
+        const res = await fetch(`${API}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: currentPatientId, message: msg })
+        });
+        const data = await res.json();
+        typing.remove();
+        if (data.reply) addMessage('assistant', data.reply);
+        else addMessage('assistant', '❌ Yanıt alınamadı: ' + (data.error || 'Bilinmeyen hata'));
+      } catch (e) {
+        typing.remove();
+        addMessage('assistant', '❌ Bağlantı hatası: ' + e.message);
+      }
+      document.getElementById('sendBtn').disabled = false;
+    }
+
+    function addMessage(role, content) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.textContent = content;
+      const time = document.createElement('div');
+      time.className = 'time';
+      time.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      div.appendChild(time);
+      document.getElementById('messages').appendChild(div);
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      const el = document.getElementById('messages');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      // Auto-resize
+      e.target.style.height = 'auto';
+      e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+    }
+
+    function sendQuick(msg) {
+      document.getElementById('chatInput').value = msg;
+      sendMessage();
+    }
+
+    // Load chat history
+    async function loadChatHistory() {
+      if (!currentPatientId) return;
+      try {
+        const res = await fetch(`${API}/chat/history/${currentPatientId}`);
+        const msgs = await res.json();
+        for (const m of msgs) {
+          if (m.role !== 'system') addMessage(m.role, m.content);
+        }
+      } catch (e) { console.error('History load error:', e); }
+    }
+
+    // Timeline
+    async function loadTimeline() {
+      try {
+        const res = await fetch(`${API}/events/${currentPatientId}`);
+        const events = await res.json();
+        const container = document.getElementById('timelineList');
+        container.innerHTML = '';
+        const typeIcons = {
+          surgery: '🔪', diagnosis: '🔍', lab_result: '🔬',
+          medication: '💊', appointment: '📅', note: '📝', symptom: '🤒'
+        };
+        for (const e of events) {
+          container.innerHTML += `
+            <div class="event-card">
+              <span class="event-date">${e.event_date}</span>
+              <span class="event-type">${typeIcons[e.event_type] || '📌'} ${e.event_type}</span>
+              <div class="event-title">${e.title}</div>
+              <div class="event-desc">${e.description || ''}</div>
+            </div>`;
+        }
+        if (events.length === 0) container.innerHTML = '<p style="color:var(--text-dim)">Henüz tıbbi olay kaydı yok.</p>';
+      } catch (e) { console.error('Timeline load error:', e); }
+    }
+
+    // Upload
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+    });
+
+    async function uploadFile(file) {
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('patientId', currentPatientId);
+      formData.append('fileType', guessFileType(file.name));
+
+      try {
+        const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.id) {
+          alert('✅ Dosya yüklendi: ' + file.name);
+          loadFiles();
+        } else {
+          alert('❌ Hata: ' + (data.error || 'Bilinmeyen'));
+        }
+      } catch (e) { alert('❌ Yükleme hatası: ' + e.message); }
+    }
+
+    function guessFileType(name) {
+      const n = name.toLowerCase();
+      if (n.includes('tahlil') || n.includes('lab') || n.includes('sonuc')) return 'lab_report';
+      if (n.includes('recete') || n.includes('ilac')) return 'prescription';
+      if (n.includes('mr') || n.includes('ct') || n.includes('rontgen') || n.includes('radyoloji')) return 'radiology';
+      return 'other';
+    }
+
+    async function loadFiles() {
+      try {
+        const res = await fetch(`${API}/files/${currentPatientId}`);
+        const files = await res.json();
+        const container = document.getElementById('uploadedFiles');
+        container.innerHTML = '';
+        for (const f of files) {
+          container.innerHTML += `
+            <div class="event-card">
+              <span class="event-date">${f.upload_date}</span>
+              <span class="event-type">📄 ${f.file_type}</span>
+              <div class="event-title">${f.original_name}</div>
+            </div>`;
+        }
+      } catch (e) { console.error('Files load error:', e); }
+    }
+
+    // ========== AI SETUP ==========
+    let aiProviders = {};
+    let selectedProvider = null;
+
+    async function checkAIConfig() {
+      try {
+        const [configRes, providersRes] = await Promise.all([
+          fetch(`${API}/ai/config`),
+          fetch(`${API}/ai/providers`)
+        ]);
+        const config = await configRes.json();
+        aiProviders = await providersRes.json();
+
+        if (!config.configured) {
+          renderProviderCards();
+          document.getElementById('setupOverlay').classList.remove('hidden');
+        } else {
+          // Config var, badge'i güncelle
+          updateHeaderAI(config);
+        }
+      } catch (e) { console.error('AI config check error:', e); }
+    }
+
+    function renderProviderCards() {
+      const container = document.getElementById('providerCards');
+      container.innerHTML = '';
+      const icons = { openai: '🤖', anthropic: '🧠', google: '💎' };
+      for (const [key, p] of Object.entries(aiProviders)) {
+        const card = document.createElement('div');
+        card.className = 'provider-card';
+        card.dataset.provider = key;
+        card.innerHTML = `
+          <div class="provider-icon">${icons[key] || '🔮'}</div>
+          <div class="provider-name">${p.name}</div>
+          <div class="provider-sub">${p.models.length} model</div>
+        `;
+        card.onclick = () => selectProvider(key);
+        container.appendChild(card);
+      }
+    }
+
+    function selectProvider(key) {
+      selectedProvider = key;
+      document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('selected'));
+      document.querySelector(`.provider-card[data-provider="${key}"]`).classList.add('selected');
+
+      // Model dropdown'ı doldur
+      const modelSelect = document.getElementById('setupModel');
+      modelSelect.innerHTML = '';
+      for (const m of aiProviders[key].models) {
+        modelSelect.innerHTML += `<option value="${m.id}">${m.label}</option>`;
+      }
+      modelSelect.innerHTML += `<option value="__custom__">✏️ Özel Model ID Gir...</option>`;
+      updateModelDesc();
+
+      // Key input
+      document.getElementById('setupApiKey').placeholder = aiProviders[key].keyPlaceholder;
+      document.getElementById('keyDocsLink').href = aiProviders[key].docsUrl;
+
+      // Step 2'ye geç
+      showStep(2);
+    }
+
+    function updateModelDesc() {
+      if (!selectedProvider) return;
+      const modelId = document.getElementById('setupModel').value;
+      const customInput = document.getElementById('setupCustomModel');
+      const customHint = document.getElementById('customModelHint');
+      if (modelId === '__custom__') {
+        customInput.style.display = 'block';
+        customHint.style.display = 'block';
+        document.getElementById('modelDesc').textContent = 'Listede olmayan yeni bir model kullanmak için API model ID\'sini yazın.';
+        customInput.focus();
+      } else {
+        customInput.style.display = 'none';
+        customHint.style.display = 'none';
+        customInput.value = '';
+        const model = aiProviders[selectedProvider].models.find(m => m.id === modelId);
+        document.getElementById('modelDesc').textContent = model?.description || '';
+      }
+    }
+
+    function showStep(n) {
+      document.querySelectorAll('.setup-step').forEach(s => s.classList.remove('active'));
+      document.getElementById(`setupStep${n}`).classList.add('active');
+      document.getElementById('dot1').classList.toggle('active', n === 1);
+      document.getElementById('dot2').classList.toggle('active', n === 2);
+      // Hata/başarı mesajlarını temizle
+      document.getElementById('setupError').style.display = 'none';
+      document.getElementById('setupSuccess').style.display = 'none';
+    }
+
+    async function saveSetup() {
+      const provider = selectedProvider;
+      let model = document.getElementById('setupModel').value;
+      if (model === '__custom__') {
+        model = document.getElementById('setupCustomModel').value.trim();
+        if (!model) {
+          document.getElementById('setupError').textContent = 'Özel model ID boş olamaz.';
+          document.getElementById('setupError').style.display = 'block';
+          return;
+        }
+      }
+      const apiKey = document.getElementById('setupApiKey').value.trim();
+      const errEl = document.getElementById('setupError');
+      const succEl = document.getElementById('setupSuccess');
+      const btn = document.getElementById('setupSaveBtn');
+
+      if (!apiKey) {
+        errEl.textContent = 'API key boş olamaz.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Doğrulanıyor...';
+      errEl.style.display = 'none';
+      succEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`${API}/ai/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, model, apiKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          succEl.textContent = '✅ API key doğrulandı ve kaydedildi! Yönlendiriliyorsunuz...';
+          succEl.style.display = 'block';
+          updateHeaderAI({ provider, model, apiKeyHint: apiKey.substring(0, 8) + '...' });
+          setTimeout(() => {
+            document.getElementById('setupOverlay').classList.add('hidden');
+          }, 1500);
+        } else {
+          errEl.textContent = data.error || 'Doğrulama başarısız.';
+          errEl.style.display = 'block';
+        }
+      } catch (e) {
+        errEl.textContent = 'Bağlantı hatası: ' + e.message;
+        errEl.style.display = 'block';
+      }
+
+      btn.disabled = false;
+      btn.textContent = '✓ Doğrula ve Kaydet';
+    }
+
+    function openSetup() {
+      // Mevcut config'i göster
+      fetch(`${API}/ai/config`).then(r => r.json()).then(config => {
+        const badge = document.getElementById('setupCurrentBadge');
+        if (config.configured) {
+          const pName = aiProviders[config.provider]?.name || config.provider;
+          document.getElementById('setupCurrentInfo').textContent = `Aktif: ${pName} / ${config.model} (${config.apiKeyHint})`;
+          badge.style.display = 'flex';
+        } else {
+          badge.style.display = 'none';
+        }
+      });
+      renderProviderCards();
+      showStep(1);
+      document.getElementById('setupOverlay').classList.remove('hidden');
+    }
+
+    function closeSetup() {
+      document.getElementById('setupOverlay').classList.add('hidden');
+    }
+
+    function updateHeaderAI(config) {
+      const statusEl = document.querySelector('.header-status');
+      const pName = aiProviders[config.provider]?.name || config.provider;
+      statusEl.textContent = `${pName} · ${config.model}`;
+    }
+
+    // ========== E-NABIZ ==========
+    function enabizLog(msg, type = '') {
+      const log = document.getElementById('enabizLog');
+      const line = document.createElement('div');
+      line.className = `log-line ${type ? 'log-' + type : ''}`;
+      line.textContent = `[${new Date().toLocaleTimeString('tr-TR')}] ${msg}`;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function updateEnabizUI(status) {
+      const badge = document.getElementById('enabizStatusBadge');
+      const labels = { idle: '● Bağlı değil', connected: '● Bağlı', 'logging-in': '● Giriş yapılıyor...', syncing: '● Senkronize ediliyor...', error: '● Hata' };
+      badge.textContent = labels[status.state] || status.state;
+      badge.className = `enabiz-status ${status.state}`;
+
+      document.getElementById('btnDisconnect').style.display = status.isRunning ? '' : 'none';
+      document.getElementById('btnManualLogin').disabled = status.state === 'logging-in' || status.state === 'syncing';
+
+      if (status.lastSync) {
+        document.getElementById('enabizLastSync').textContent = `Son sync: ${new Date(status.lastSync).toLocaleString('tr-TR')}`;
+      }
+    }
+
+    async function enabizCheckStatus() {
+      if (!currentPatientId) return;
+      try {
+        const res = await fetch(`${API}/enabiz/status/${currentPatientId}`);
+        const status = await res.json();
+        updateEnabizUI(status);
+      } catch (e) { /* server down */ }
+    }
+
+    async function enabizManualLogin() {
+      if (!currentPatientId) return alert('Lütfen önce bir hasta seçin.');
+      enabizLog('Tarayıcı açılıyor... E-Nabız\'a giriş yapın.', 'info');
+      try {
+        const res = await fetch(`${API}/enabiz/manual-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: currentPatientId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          enabizLog('Giriş başarılı!', 'success');
+        } else {
+          enabizLog('Giriş başarısız: ' + data.error, 'error');
+        }
+      } catch (e) {
+        enabizLog('Bağlantı hatası: ' + e.message, 'error');
+      }
+      enabizCheckStatus();
+    }
+
+    async function enabizAutoLogin() {
+      if (!currentPatientId) return alert('Lütfen önce bir hasta seçin.');
+      const patient = allPatients.find(p => p.id === currentPatientId);
+      const tc = prompt('TC Kimlik No:', patient?.tc_no || '');
+      if (!tc) return;
+      const pw = prompt('E-Devlet Şifresi:');
+      if (!pw) return;
+
+      enabizLog('Otomatik giriş yapılıyor...', 'info');
+      try {
+        const res = await fetch(`${API}/enabiz/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: currentPatientId, tc, password: pw })
+        });
+        const data = await res.json();
+        if (data.success) {
+          enabizLog('Giriş başarılı!', 'success');
+        } else {
+          enabizLog('Giriş başarısız: ' + data.error, 'error');
+        }
+      } catch (e) {
+        enabizLog('Bağlantı hatası: ' + e.message, 'error');
+      }
+      enabizCheckStatus();
+    }
+
+    async function enabizDisconnect() {
+      if (!currentPatientId) return;
+      try {
+        await fetch(`${API}/enabiz/disconnect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: currentPatientId })
+        });
+        enabizLog('Bağlantı kapatıldı.', 'info');
+      } catch (e) {
+        enabizLog('Hata: ' + e.message, 'error');
+      }
+      enabizCheckStatus();
+    }
+
+    async function enabizFetch(type) {
+      if (!currentPatientId) return alert('Lütfen önce bir hasta seçin.');
+      enabizLog(`${type === 'all' ? 'Tüm veriler' : type} çekiliyor...`, 'info');
+      try {
+        const res = await fetch(`${API}/enabiz/fetch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: currentPatientId, type })
+        });
+        const data = await res.json();
+        if (data.success) {
+          enabizLog(`Başarılı! Son sync: ${new Date(data.lastSync).toLocaleString('tr-TR')}`, 'success');
+          if (data.result && data.result.labs) enabizLog(`  Tahliller: ${data.result.labs.count || 0}`, 'success');
+          if (data.result && data.result.prescriptions) enabizLog(`  Reçeteler: ${data.result.prescriptions.length || 0}`, 'success');
+          if (data.result && data.result.visits) enabizLog(`  Muayeneler: ${data.result.visits.length || 0}`, 'success');
+          if (data.result && data.result.radiology) enabizLog(`  Radyoloji: ${data.result.radiology.length || 0}`, 'success');
+          loadSummary(); // Sidebar'ı güncelle
+        } else {
+          enabizLog('Hata: ' + data.error, 'error');
+        }
+      } catch (e) {
+        enabizLog('Bağlantı hatası: ' + e.message, 'error');
+      }
+      enabizCheckStatus();
+    }
+
+    // ========== CALENDAR ==========
+    let calYear = new Date().getFullYear();
+    let calMonth = new Date().getMonth(); // 0-indexed
+    let calData = {};
+
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                         'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+    function calNavMonth(dir) {
+      calMonth += dir;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      loadCalendar();
+    }
+
+    async function loadCalendar() {
+      if (!currentPatientId) return;
+      document.getElementById('calMonthTitle').textContent = `${monthNames[calMonth]} ${calYear}`;
+      document.getElementById('calDayDetail').style.display = 'none';
+
+      try {
+        const res = await fetch(`${API}/calendar/${currentPatientId}/${calYear}/${calMonth + 1}`);
+        calData = await res.json();
+      } catch (e) {
+        calData = {};
+      }
+
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      // Day headers
+      for (const d of dayNames) {
+        grid.innerHTML += `<div class="cal-head">${d}</div>`;
+      }
+
+      const firstDay = new Date(calYear, calMonth, 1);
+      let startDow = firstDay.getDay() - 1; // Monday = 0
+      if (startDow < 0) startDow = 6;
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+
+      // Previous month empty slots
+      for (let i = 0; i < startDow; i++) {
+        grid.innerHTML += '<div class="cal-day other-month"></div>';
+      }
+
+      // Days
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const dayEvents = calData[dateStr] || [];
+
+        let dotsHtml = '';
+        const hasEvent = dayEvents.some(e => e.type === 'event');
+        const hasLab = dayEvents.some(e => e.type === 'lab' && !e.isAbnormal);
+        const hasAbnormal = dayEvents.some(e => e.type === 'lab' && e.isAbnormal);
+        const hasMed = dayEvents.some(e => e.type === 'medication');
+        const hasReminder = dayEvents.some(e => e.type === 'reminder');
+
+        if (hasEvent) dotsHtml += '<span class="cal-dot event"></span>';
+        if (hasLab) dotsHtml += '<span class="cal-dot lab"></span>';
+        if (hasAbnormal) dotsHtml += '<span class="cal-dot abnormal"></span>';
+        if (hasMed) dotsHtml += '<span class="cal-dot med"></span>';
+        if (hasReminder) dotsHtml += '<span class="cal-dot reminder"></span>';
+
+        const dayEl = document.createElement('div');
+        dayEl.className = `cal-day${isToday ? ' today' : ''}`;
+        dayEl.innerHTML = `<div class="cal-day-num">${d}</div><div class="cal-day-dots">${dotsHtml}</div>`;
+        dayEl.onclick = () => showDayDetail(dateStr, dayEvents);
+        grid.appendChild(dayEl);
+      }
+    }
+
+    function showDayDetail(dateStr, events) {
+      const detail = document.getElementById('calDayDetail');
+      if (!events || events.length === 0) {
+        detail.innerHTML = `<div class="cal-day-detail"><h4>📅 ${dateStr}</h4><p style="color:var(--text-dim);font-size:13px">Bu tarihte kayıt bulunmuyor.</p></div>`;
+        detail.style.display = '';
+        return;
+      }
+
+      const typeIcons = {
+        event: { surgery: '🔪', diagnosis: '🔍', lab_result: '🔬', medication: '💊', appointment: '📅', note: '📝', symptom: '🤒' },
+        lab: '🧪',
+        medication: '💊',
+        reminder: { appointment: '📅', medication: '💊', checkup: '🔬', custom: '📌' }
+      };
+
+      let itemsHtml = '';
+      for (const item of events) {
+        let icon = '📌';
+        let title = item.title;
+        let desc = '';
+
+        if (item.type === 'event') {
+          icon = typeIcons.event[item.eventType] || '📌';
+          desc = item.description || '';
+        } else if (item.type === 'lab') {
+          icon = item.isAbnormal ? '⚠️' : '🧪';
+          desc = item.value || '';
+        } else if (item.type === 'medication') {
+          icon = '💊';
+          desc = item.value || '';
+        } else if (item.type === 'reminder') {
+          icon = typeIcons.reminder[item.reminderType] || '📌';
+          desc = `${item.time || ''}${item.description ? ' - ' + item.description : ''}`;
+        }
+
+        itemsHtml += `
+          <div class="cal-detail-item">
+            <span class="cal-detail-icon">${icon}</span>
+            <div>
+              <div class="cal-detail-title">${escapeHtml(title)}</div>
+              ${desc ? `<div class="cal-detail-desc">${escapeHtml(desc)}</div>` : ''}
+            </div>
+          </div>`;
+      }
+
+      detail.innerHTML = `<div class="cal-day-detail"><h4>📅 ${dateStr} (${events.length} kayıt)</h4>${itemsHtml}</div>`;
+      detail.style.display = '';
+    }
+
+    // ========== REMINDERS ==========
+    async function loadReminders() {
+      if (!currentPatientId) return;
+      try {
+        const res = await fetch(`${API}/reminders/${currentPatientId}`);
+        const reminders = await res.json();
+        const container = document.getElementById('remindersList');
+        container.innerHTML = '';
+
+        if (reminders.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-dim);font-size:13px">Henüz hatırlatıcı yok. Yukarıdaki formu kullanarak ekleyin.</p>';
+          return;
+        }
+
+        const typeIcons = { appointment: '📅', medication: '💊', checkup: '🔬', custom: '📌' };
+        const repeatLabels = { none: '', daily: '🔄 Her gün', weekly: '🔄 Her hafta', monthly: '🔄 Her ay' };
+
+        for (const r of reminders) {
+          const icon = typeIcons[r.reminder_type] || '📌';
+          const repeatLabel = repeatLabels[r.repeat_type] || '';
+          const isPast = new Date(`${r.reminder_date}T${r.reminder_time}`) < new Date();
+
+          container.innerHTML += `
+            <div class="reminder-card" style="${r.notified ? 'opacity:0.5' : ''}${isPast && !r.notified ? ';border-color:var(--warning)' : ''}">
+              <span class="reminder-icon">${icon}</span>
+              <div class="reminder-info">
+                <div class="reminder-title">${escapeHtml(r.title)}</div>
+                <div class="reminder-meta">
+                  📆 ${r.reminder_date} ⏰ ${r.reminder_time}
+                  ${repeatLabel ? ' · ' + repeatLabel : ''}
+                  ${r.description ? ' · ' + escapeHtml(r.description) : ''}
+                  ${r.notified ? ' · ✅ Bildirildi' : ''}
+                </div>
+              </div>
+              <div class="reminder-actions">
+                <button onclick="editReminder(${r.id})" title="Düzenle">✏️</button>
+                <button class="del" onclick="deleteReminder(${r.id})" title="Sil">🗑️</button>
+              </div>
+            </div>`;
+        }
+      } catch (e) {
+        console.error('Reminders load error:', e);
+      }
+    }
+
+    async function saveReminder() {
+      if (!currentPatientId) return alert('Lütfen önce bir hasta seçin.');
+      const id = document.getElementById('rfId').value;
+      const title = document.getElementById('rfTitle').value.trim();
+      const reminderDate = document.getElementById('rfDate').value;
+      const reminderTime = document.getElementById('rfTime').value;
+
+      if (!title || !reminderDate || !reminderTime) return alert('Başlık, tarih ve saat zorunludur.');
+
+      const body = {
+        patientId: currentPatientId,
+        title,
+        description: document.getElementById('rfDesc').value.trim(),
+        reminderType: document.getElementById('rfType').value,
+        reminderDate,
+        reminderTime,
+        repeatType: document.getElementById('rfRepeat').value
+      };
+
+      try {
+        const url = id ? `${API}/reminders/${id}` : `${API}/reminders`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.error) return alert('Hata: ' + data.error);
+        resetReminderForm();
+        loadReminders();
+      } catch (e) {
+        alert('Hata: ' + e.message);
+      }
+    }
+
+    async function editReminder(id) {
+      try {
+        const res = await fetch(`${API}/reminders/${currentPatientId}`);
+        const reminders = await res.json();
+        const r = reminders.find(x => x.id === id);
+        if (!r) return;
+
+        document.getElementById('rfId').value = r.id;
+        document.getElementById('rfTitle').value = r.title;
+        document.getElementById('rfType').value = r.reminder_type;
+        document.getElementById('rfRepeat').value = r.repeat_type || 'none';
+        document.getElementById('rfDate').value = r.reminder_date;
+        document.getElementById('rfTime').value = r.reminder_time;
+        document.getElementById('rfDesc').value = r.description || '';
+        document.getElementById('reminderFormTitle').textContent = 'Hatırlatıcıyı Düzenle';
+      } catch (e) {
+        alert('Hata: ' + e.message);
+      }
+    }
+
+    async function deleteReminder(id) {
+      if (!confirm('Bu hatırlatıcıyı silmek istediğinize emin misiniz?')) return;
+      try {
+        await fetch(`${API}/reminders/${id}`, { method: 'DELETE' });
+        loadReminders();
+      } catch (e) {
+        alert('Hata: ' + e.message);
+      }
+    }
+
+    function resetReminderForm() {
+      document.getElementById('rfId').value = '';
+      document.getElementById('rfTitle').value = '';
+      document.getElementById('rfType').value = 'appointment';
+      document.getElementById('rfRepeat').value = 'none';
+      document.getElementById('rfDate').value = '';
+      document.getElementById('rfTime').value = '09:00';
+      document.getElementById('rfDesc').value = '';
+      document.getElementById('reminderFormTitle').textContent = 'Yeni Hatırlatıcı';
+    }
+
+    // Init
+    async function init() {
+      await checkAIConfig();
+      const patients = await loadPatients();
+      if (patients.length > 0) {
+        await switchPatient(patients[0].id);
+      }
+    }
+    init();
+  </script>
+</body>
+</html>

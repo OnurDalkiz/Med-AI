@@ -1,0 +1,251 @@
+{
+  "discovered": {
+    "labs": "https://enabiz.gov.tr/Home/Tahlillerim",
+    "prescriptions": "https://enabiz.gov.tr/Home/Recetelerim",
+    "visits": "https://enabiz.gov.tr/Home/Randevularim",
+    "radiology": "https://enabiz.gov.tr/Home/RadyolojikGoruntulerim"
+  },
+  "allLinks": [
+    {
+      "href": "/Account/Cookies",
+      "text": "Çerez Politikası"
+    },
+    {
+      "href": "/Home/AnasayfaBildirimler",
+      "text": "0"
+    },
+    {
+      "href": "/Account/SetLanguage?culture=en-US",
+      "text": "English"
+    },
+    {
+      "href": "/Account/SetLanguage?culture=de-DE",
+      "text": "Deutsch"
+    },
+    {
+      "href": "/Account/SetLanguage?culture=ar-SA",
+      "text": "العربية"
+    },
+    {
+      "href": "/Account/SetLanguage?culture=fr-FR",
+      "text": "Français"
+    },
+    {
+      "href": "/Account/SetLanguage?culture=ru-RU",
+      "text": "Русский"
+    },
+    {
+      "href": "/Home/ProfilBilgilerim",
+      "text": "Profil Düzenle"
+    },
+    {
+      "href": "/Account/Logout",
+      "text": "Güvenli Çıkış"
+    },
+    {
+      "href": "/",
+      "text": "Ana Sayfa"
+    },
+    {
+      "href": "/Home/Ziyaretlerim",
+      "text": "Ziyaretlerim"
+    },
+    {
+      "href": "/Home/Recetelerim",
+      "text": "Reçetelerim"
+    },
+    {
+      "href": "/Home/Raporlarim",
+      "text": "Raporlarım"
+    },
+    {
+      "href": "/Home/Hastaliklarim",
+      "text": "Hastalıklarım"
+    },
+    {
+      "href": "/Home/Tahlillerim",
+      "text": "Tahlillerim"
+    },
+    {
+      "href": "/Home/RadyolojikGoruntulerim",
+      "text": "Radyolojik Görüntülerim"
+    },
+    {
+      "href": "/Home/Patolojilerim",
+      "text": "Patoloji Bilgilerim"
+    },
+    {
+      "href": "/Home/Epikrizlerim",
+      "text": "Epikriz Bilgilerim"
+    },
+    {
+      "href": "/Home/MalzemeveCihazlarim",
+      "text": "Malzeme ve Cihazlarım"
+    },
+    {
+      "href": "/Home/Taramalar",
+      "text": "Tarama Verilerim"
+    },
+    {
+      "href": "/Home/Eczaneler",
+      "text": "Tümü için tıklayınız"
+    },
+    {
+      "href": "/Home/KemikiligiKanBagisi",
+      "text": "Kemik İliği ve Kan Bağışı"
+    },
+    {
+      "href": "/Home/Hastaneler",
+      "text": "En Yakın Hastane"
+    },
+    {
+      "href": "/Home/IlacimNerede",
+      "text": "İlacım Nerede?"
+    },
+    {
+      "href": "/Home/OrganBagisBeyan",
+      "text": "Organ Bağışı"
+    },
+    {
+      "href": "https://sbos.saglik.gov.tr",
+      "text": "SBÖS"
+    },
+    {
+      "href": "/Home/Eczaneler",
+      "text": "Tümü için tıklayınız"
+    },
+    {
+      "href": "/Home/KemikiligiKanBagisi",
+      "text": "Kemik İliği ve Kan Bağışı"
+    },
+    {
+      "href": "/Home/Hastaneler",
+      "text": "En Yakın Hastane"
+    },
+    {
+      "href": "/Home/IlacimNerede",
+      "text": "İlacım Nerede?"
+    },
+    {
+      "href": "/Home/OrganBagisBeyan",
+      "text": "Organ Bağışı"
+    },
+    {
+      "href": "https://sbos.saglik.gov.tr",
+      "text": "SBÖS"
+    },
+    {
+      "href": "/Home/Eczaneler",
+      "text": "Tümü için tıklayınız"
+    },
+    {
+      "href": "/Home/OrganBagisBeyan",
+      "text": "Organ Bağışı\n                    \n                        Her bağış, yeni bir hayattır."
+    },
+    {
+      "href": "/Home/IlacimNerede",
+      "text": "İlacım Nerede?\n                    \n                        Eczane ilaç stok sorgulama."
+    },
+    {
+      "href": "/Home/ProfilBilgilerim",
+      "text": "Kişi Ekle \n                    \n                        Acil durumda aranacak öncelikli kişiler"
+    },
+    {
+      "href": "/Home/GuvenlikAyarlari",
+      "text": "Ayarlar\n                    \n                        Güvenlik Ayarlarını gözden geçir"
+    },
+    {
+      "href": "/Home/Ziyaretlerim",
+      "text": "Tahlil"
+    },
+    {
+      "href": "/Home/Ziyaretlerim",
+      "text": "Tahlil"
+    },
+    {
+      "href": "/ailehekimidegistir/index",
+      "text": "Aile Hekimi Değiştir"
+    },
+    {
+      "href": "https://sbos.saglik.gov.tr/files/Afis.pdf",
+      "text": "Detay"
+    },
+    {
+      "href": "https://www.saglik.gov.tr/TR-109182/bakan-memisoglu-yanik-tedavi-hizmetleri-62-merkezde-780-yatak-kapasitesine-ulasti.html",
+      "text": "Detay"
+    },
+    {
+      "href": "https://www.saglik.gov.tr/TR-109181/saglik-bakani-prof-dr-kemal-memisoglunun-kocaeli-ziyareti.htmll",
+      "text": "Detay"
+    },
+    {
+      "href": "https://www.saglik.gov.tr/TR-109180/bakan-memisoglu-bugun-gazzenin-en-cok-ihtiyac-duydugu-sey-insanligin-insanligidir.html",
+      "text": "Detay"
+    },
+    {
+      "href": "/Account/LogoutWebSessions",
+      "text": "Tüm Web Oturumları Kapat"
+    },
+    {
+      "href": "/Home/OrganBagisBeyan",
+      "text": "Evet"
+    },
+    {
+      "href": "/Home/Alerjilerim",
+      "text": "Alerjilerim"
+    },
+    {
+      "href": "/Home/HastaveYakiniBilgilendirme",
+      "text": "Hasta ve Hasta Yakını Bilgilendirme"
+    },
+    {
+      "href": "/Home/Sigortalarim",
+      "text": "Sigorta İşlemleri"
+    },
+    {
+      "href": "/Home/AcilDurumNotlarim",
+      "text": "Acil Durum Notlarım"
+    },
+    {
+      "href": "/Home/Dokumanlarim",
+      "text": "Dokümanlarım"
+    },
+    {
+      "href": "/Home/AsiTakvimi",
+      "text": "Aşı Takvimi"
+    },
+    {
+      "href": "/Home/Ilaclarim",
+      "text": "İlaçlarım"
+    },
+    {
+      "href": "/Home/Paylasimlarim",
+      "text": "Paylaşım"
+    },
+    {
+      "href": "/Home/Randevularim",
+      "text": "Randevu"
+    },
+    {
+      "href": "/Home/GeriBildirim",
+      "text": "Geri Bildirim"
+    },
+    {
+      "href": "/Home/OrganBagisBeyan",
+      "text": "Organ Bağışı"
+    },
+    {
+      "href": "/Home/KemikiligiKanBagisi",
+      "text": "Kemik İliği ve Kan Bağışı"
+    },
+    {
+      "href": "/Home/DurumBeyanlarim2",
+      "text": "Sağlık Durum Belgelerim"
+    },
+    {
+      "href": "tel:08502400303",
+      "text": "0850 240 03 03"
+    }
+  ],
+  "timestamp": "2026-03-09T09:55:44.825Z"
+}
