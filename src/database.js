@@ -1,8 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
-
-const DB_PATH = path.join(__dirname, '..', 'data', 'medai.db');
+const { DB_PATH } = require('./config');
 
 // data klasörünü oluştur
 const dataDir = path.dirname(DB_PATH);
@@ -114,5 +113,37 @@ db.exec(`
     FOREIGN KEY (patient_id) REFERENCES patients(id)
   );
 `);
+
+// Deduplication: Önce mevcut duplikeleri temizle, sonra unique indexler oluştur
+// Sadece index yoksa çalışır (ilk sefer)
+const hasLabIndex = db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_lab_unique'").get();
+if (!hasLabIndex) {
+  db.exec(`
+    DELETE FROM lab_results WHERE id NOT IN (
+      SELECT MIN(id) FROM lab_results GROUP BY patient_id, test_date, test_name, test_value
+    );
+    CREATE UNIQUE INDEX idx_lab_unique ON lab_results(patient_id, test_date, test_name, test_value);
+  `);
+}
+
+const hasEventIndex = db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_event_unique'").get();
+if (!hasEventIndex) {
+  db.exec(`
+    DELETE FROM medical_events WHERE id NOT IN (
+      SELECT MIN(id) FROM medical_events GROUP BY patient_id, event_date, event_type, title
+    );
+    CREATE UNIQUE INDEX idx_event_unique ON medical_events(patient_id, event_date, event_type, title);
+  `);
+}
+
+const hasMedIndex = db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_med_unique'").get();
+if (!hasMedIndex) {
+  db.exec(`
+    DELETE FROM medications WHERE id NOT IN (
+      SELECT MIN(id) FROM medications GROUP BY patient_id, name, start_date
+    );
+    CREATE UNIQUE INDEX idx_med_unique ON medications(patient_id, name, start_date);
+  `);
+}
 
 module.exports = db;

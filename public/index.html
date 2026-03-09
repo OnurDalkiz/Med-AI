@@ -238,6 +238,8 @@
       padding: 14px;
       margin-bottom: 10px;
     }
+    .event-card.clickable { cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+    .event-card.clickable:hover { border-color: var(--primary); background: rgba(99,102,241,0.06); }
     .event-card .event-date { font-size: 11px; color: var(--primary); }
     .event-card .event-type {
       font-size: 10px; text-transform: uppercase;
@@ -1112,6 +1114,40 @@
       return div.innerHTML;
     }
 
+    function cleanRadiologyReport(text) {
+      if (!text) return '';
+      let t = text;
+      // Remove CSS blocks
+      t = t.replace(/[^{}]*\{[^}]*\}/g, '');
+      t = t.replace(/@media[^{]*\{[^}]*\}/g, '');
+      // Remove boilerplate
+      t = t.replace(/Rapor Detay Bilgisi/gi, '');
+      t = t.replace(/download\s*İndir/gi, '');
+      t = t.replace(/print\s*Yazdır/gi, '');
+      // Clean whitespace
+      t = t.replace(/\n{3,}/g, '\n\n').trim();
+      return t;
+    }
+
+    async function loadRadiologyImage(imageId) {
+      const container = document.getElementById('radiologyImageContainer');
+      if (!container) return;
+      container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">⏳ Görüntü yükleniyor...</div>';
+      const retryBtn = `<button class="btn" style="background:var(--primary);color:#fff;padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;margin-top:8px" onclick="loadRadiologyImage('${imageId}')">🔄 Tekrar Dene</button>`;
+      try {
+        const res = await fetch(`${API}/enabiz/radiology-image/${currentPatientId}/${imageId}`);
+        const data = await res.json();
+        if (data.success && data.imageData) {
+          container.innerHTML = `<img src="${data.imageData}" style="max-width:100%;border-radius:8px;cursor:pointer" onclick="window.open(this.src,'_blank')" alt="Radyoloji Görüntüsü">`;
+        } else {
+          const msg = data.error || 'Görüntü alınamadı.';
+          container.innerHTML = `<div style="text-align:center;padding:12px;color:var(--text-secondary)">⚠️ ${escapeHtml(msg)}</div>${retryBtn}`;
+        }
+      } catch(e) {
+        container.innerHTML = `<div style="text-align:center;padding:12px;color:var(--text-secondary)">⚠️ E-Nabız bağlantısı aktif değil. Önce E-Nabız'a giriş yapın.</div>${retryBtn}`;
+      }
+    }
+
     function renderPatientList() {
       const container = document.getElementById('patientList');
       container.innerHTML = '';
@@ -1366,15 +1402,26 @@
         container.innerHTML = '';
         const typeIcons = {
           surgery: '🔪', diagnosis: '🔍', lab_result: '🔬',
-          medication: '💊', appointment: '📅', note: '📝', symptom: '🤒'
+          medication: '💊', appointment: '📅', note: '📝', symptom: '🤒',
+          prescription: '💊', radiology: '📷', epicrisis: '📋',
+          report: '📑', allergy: '🤧', vaccine: '💉',
+          chronic_disease: '🩺', surgery_record: '🔪'
+        };
+        const typeLabels = {
+          surgery: 'Ameliyat', diagnosis: 'Tanı', lab_result: 'Tahlil',
+          medication: 'İlaç', appointment: 'Randevu', note: 'Not', symptom: 'Semptom',
+          prescription: 'Reçete', radiology: 'Radyoloji', epicrisis: 'Epikriz',
+          report: 'Rapor', allergy: 'Alerji', vaccine: 'Aşı',
+          chronic_disease: 'Kronik Hastalık', surgery_record: 'Ameliyat'
         };
         for (const e of events) {
+          const descPreview = e.description ? escapeHtml(e.description.split('|')[0].substring(0, 120)) + (e.description.length > 120 ? '...' : '') : '';
           container.innerHTML += `
-            <div class="event-card">
+            <div class="event-card clickable" onclick="openPreview('event', ${e.id})">
               <span class="event-date">${e.event_date}</span>
-              <span class="event-type">${typeIcons[e.event_type] || '📌'} ${e.event_type}</span>
-              <div class="event-title">${e.title}</div>
-              <div class="event-desc">${e.description || ''}</div>
+              <span class="event-type">${typeIcons[e.event_type] || '📌'} ${typeLabels[e.event_type] || e.event_type}</span>
+              <div class="event-title">${escapeHtml(e.title)}</div>
+              <div class="event-desc">${descPreview}</div>
             </div>`;
         }
         if (events.length === 0) container.innerHTML = '<p style="color:var(--text-dim)">Henüz tıbbi olay kaydı yok.</p>';
@@ -2131,7 +2178,10 @@
         }
 
         if (reportText) {
-          html += `<div class="preview-field"><div class="preview-field-label">📄 Radyoloji Raporu</div><div class="preview-field-value" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:300px;overflow:auto;margin-top:4px">${escapeHtml(reportText)}</div></div>`;
+          const cleaned = cleanRadiologyReport(reportText);
+          if (cleaned) {
+            html += `<div class="preview-field"><div class="preview-field-label">📄 Radyoloji Raporu</div><div class="preview-field-value" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:300px;overflow:auto;margin-top:4px">${escapeHtml(cleaned)}</div></div>`;
+          }
         }
         return html;
       }
@@ -2220,7 +2270,16 @@
 
       if (eventType === 'radiology') {
         if (data.reportText && !html.includes('Radyoloji Raporu')) {
-          html += `<div class="preview-field"><div class="preview-field-label">📄 Rapor Metni</div><div class="preview-field-value" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:300px;overflow:auto">${escapeHtml(data.reportText)}</div></div>`;
+          const cleanedReport = cleanRadiologyReport(data.reportText);
+          if (cleanedReport) {
+            html += `<div class="preview-field"><div class="preview-field-label">📄 Rapor Metni</div><div class="preview-field-value" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:300px;overflow:auto">${escapeHtml(cleanedReport)}</div></div>`;
+          }
+        }
+        if (!data.reportText && !html.includes('Radyoloji Raporu')) {
+          html += `<div class="preview-field"><div class="preview-field-label">📄 Rapor</div><div class="preview-field-value" style="color:var(--text-dim);font-style:italic">Bu kayıt için yazılı rapor metni mevcut değil.</div></div>`;
+        }
+        if (data.imageId) {
+          html += `<div class="preview-field"><div class="preview-field-label">🖼️ Görüntü</div><div id="radiologyImageContainer"><button class="btn" style="background:var(--primary);color:#fff;padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px" onclick="loadRadiologyImage('${escapeHtml(data.imageId)}')">📷 Görüntüyü Yükle</button></div></div>`;
         }
       }
 

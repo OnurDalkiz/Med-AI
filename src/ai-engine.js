@@ -1,8 +1,9 @@
 const db = require('./database');
 const fs = require('fs');
 const path = require('path');
+const { AI_CONFIG_PATH, CHAT_HISTORY_LIMIT } = require('./config');
 
-const CONFIG_PATH = path.join(__dirname, '..', 'data', 'ai-config.json');
+const CONFIG_PATH = AI_CONFIG_PATH;
 
 // Desteklenen modeller (Mart 2026 güncel)
 const PROVIDERS = {
@@ -416,10 +417,10 @@ async function chat(patientId, userMessage) {
     systemPrompt += `\n\n## Hasta: ${patient.name}\n- Tanı: ${patient.diagnosis || 'Belirtilmemiş'}\n- Notlar: ${patient.notes || 'Yok'}`;
   }
 
-  // Son 20 mesajı al
+  // Son mesajları al
   const history = db.prepare(
-    'SELECT role, content FROM chat_history WHERE patient_id = ? ORDER BY id DESC LIMIT 20'
-  ).all(patientId).reverse();
+    'SELECT role, content FROM chat_history WHERE patient_id = ? ORDER BY id DESC LIMIT ?'
+  ).all(patientId, CHAT_HISTORY_LIMIT).reverse();
 
   const messages = [
     { role: 'system', content: systemPrompt + '\n\n' + patientContext },

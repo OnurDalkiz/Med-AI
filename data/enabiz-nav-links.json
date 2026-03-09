@@ -3,7 +3,9 @@
     "labs": "https://enabiz.gov.tr/Home/Tahlillerim",
     "prescriptions": "https://enabiz.gov.tr/Home/Recetelerim",
     "visits": "https://enabiz.gov.tr/Home/Randevularim",
-    "radiology": "https://enabiz.gov.tr/Home/RadyolojikGoruntulerim"
+    "radiology": "https://enabiz.gov.tr/Home/RadyolojikGoruntulerim",
+    "allergies": "https://enabiz.gov.tr/Home/Alerjilerim",
+    "vaccines": "https://www.saglik.gov.tr/TR-109182/bakan-memisoglu-yanik-tedavi-hizmetleri-62-merkezde-780-yatak-kapasitesine-ulasti.html"
   },
   "allLinks": [
     {
@@ -33,10 +35,6 @@
     {
       "href": "/Account/SetLanguage?culture=ru-RU",
       "text": "Русский"
-    },
-    {
-      "href": "/ProfilDegistir/ProfilDegistir/CfDJ8JGBQn8KGPNApd-MVDRd9e-afSDd_m8Ia0KrIabK1rzkTHJezP0BfWTs163RIXP52n7Gq2q4fH4HGUqqtL7FafhFtBTP9OSBnSsChm6JfNJe744OvjC9WNEkpWVLwHtWZQ?profilState=1",
-      "text": "DOĞA DALKIZ"
     },
     {
       "href": "/Home/ProfilBilgilerim",
@@ -148,7 +146,7 @@
     },
     {
       "href": "/Home/IlacimNerede",
-      "text": "İlacım Nerede?\n                    \n                        Eczane ilaç stok sorgulama."
+      "text": "İlacım Nerede?\n                    \n                        Eczane ilaç sorgulama."
     },
     {
       "href": "/Home/ProfilBilgilerim",
@@ -160,11 +158,11 @@
     },
     {
       "href": "/Home/Ziyaretlerim",
-      "text": "Reçete"
+      "text": "Tahlil"
     },
     {
       "href": "/Home/Ziyaretlerim",
-      "text": "Reçete"
+      "text": "Tahlil"
     },
     {
       "href": "/ailehekimidegistir/index",
@@ -251,5 +249,5 @@
       "text": "0850 240 03 03"
     }
   ],
-  "timestamp": "2026-03-09T11:13:40.202Z"
+  "timestamp": "2026-03-09T14:27:03.964Z"
 }

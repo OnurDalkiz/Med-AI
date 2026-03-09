@@ -1,20 +1,20 @@
 const notifier = require('node-notifier');
 const path = require('path');
 const db = require('./database');
-
-const APP_NAME = 'MedAI Doktor Bot';
+const { APP_NAME, CRITICAL_KEYWORDS, PUBLIC_DIR } = require('./config');
+const logger = require('./logger');
 
 function sendNotification(title, message, patientName) {
   const fullTitle = patientName ? `${APP_NAME} - ${patientName}` : APP_NAME;
   notifier.notify({
     title: fullTitle,
     message: message,
-    icon: path.join(__dirname, '..', 'public', 'icon.png'),
+    icon: path.join(PUBLIC_DIR, 'icon.png'),
     appID: 'MedAI',
     sound: true,
     wait: false
   });
-  console.log(`🔔 Bildirim: [${fullTitle}] ${message}`);
+  logger.notify(`[${fullTitle}] ${message}`);
 }
 
 // Her dakika çalışacak: aktif hatırlatıcıları kontrol et
@@ -131,9 +131,9 @@ function getNextDate(dateStr, repeatType) {
 function runChecks() {
   try {
     const remindersCount = checkReminders();
-    if (remindersCount > 0) console.log(`🔔 ${remindersCount} hatırlatıcı gönderildi`);
+    if (remindersCount > 0) logger.info('NOTIFY', `${remindersCount} hatırlatıcı gönderildi`);
   } catch (e) {
-    console.error('Reminder check error:', e.message);
+    logger.error('NOTIFY', 'Reminder check error', e);
   }
 }
 
@@ -142,9 +142,102 @@ function runHourlyChecks() {
   try {
     checkAbnormalLabs();
     checkUpcomingAppointments();
+    checkTodayAppointments();
   } catch (e) {
-    console.error('Hourly check error:', e.message);
+    logger.error('NOTIFY', 'Hourly check error', e);
   }
 }
 
-module.exports = { sendNotification, runChecks, runHourlyChecks };
+// Bugünkü randevuları kontrol et
+function checkTodayAppointments() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const todayEvents = db.prepare(`
+    SELECT me.*, p.name as patient_name
+    FROM medical_events me
+    JOIN patients p ON me.patient_id = p.id
+    WHERE me.event_type = 'appointment'
+      AND me.event_date = ?
+  `).all(today);
+
+  for (const evt of todayEvents) {
+    sendNotification(
+      '📅 Bugünkü Randevu',
+      `${evt.title}${evt.description ? '\n' + evt.description.substring(0, 150) : ''}`,
+      evt.patient_name
+    );
+  }
+
+  return todayEvents.length;
+}
+
+// Senkronizasyon sonrası kritik bulgu kontrolü — yeni eklenen lab/event'leri analiz et
+function checkPostSyncCriticals(patientId, syncStartTime) {
+  const patient = db.prepare('SELECT name FROM patients WHERE id = ?').get(patientId);
+  if (!patient) return;
+
+  const notifications = [];
+
+  // 1. Yeni anormal tahliller (sync sırasında eklenmiş)
+  const newAbnormalLabs = db.prepare(`
+    SELECT * FROM lab_results
+    WHERE patient_id = ? AND is_abnormal = 1 AND created_at > ?
+  `).all(patientId, syncStartTime);
+
+  if (newAbnormalLabs.length > 0) {
+    const labList = newAbnormalLabs
+      .slice(0, 5)
+      .map(l => `${l.test_name}: ${l.test_value} ${l.unit || ''} (ref: ${l.reference_range || '?'})`)
+      .join('\n');
+    notifications.push({
+      title: '⚠️ Anormal Tahlil Sonuçları',
+      message: `${newAbnormalLabs.length} anormal sonuç:\n${labList}`
+    });
+  }
+
+  // 2. Bugün veya yarınki randevular
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const upcomingAppts = db.prepare(`
+    SELECT * FROM medical_events
+    WHERE patient_id = ? AND event_type = 'appointment'
+      AND event_date IN (?, ?)
+  `).all(patientId, today, tomorrow);
+
+  for (const appt of upcomingAppts) {
+    const isToday = appt.event_date === today;
+    notifications.push({
+      title: isToday ? '📅 Bugünkü Randevu' : '📅 Yarınki Randevu',
+      message: appt.title + (appt.description ? '\n' + appt.description.substring(0, 150) : '')
+    });
+  }
+
+  // 3. Kritik tanılar (yeni eklenen)
+  const newDiagnoses = db.prepare(`
+    SELECT * FROM medical_events
+    WHERE patient_id = ? AND event_type IN ('diagnosis', 'chronic_disease') AND created_at > ?
+  `).all(patientId, syncStartTime);
+
+  for (const diag of newDiagnoses) {
+    const text = ((diag.title || '') + ' ' + (diag.description || '')).toLowerCase();
+    if (CRITICAL_KEYWORDS.some(kw => text.includes(kw))) {
+      notifications.push({
+        title: '🚨 Kritik Tanı',
+        message: diag.title
+      });
+    }
+  }
+
+  // Bildirimleri gönder
+  for (const n of notifications) {
+    sendNotification(n.title, n.message, patient.name);
+  }
+
+  if (notifications.length > 0) {
+    logger.info('NOTIFY', `${notifications.length} kritik bildirim gönderildi (Hasta: ${patient.name})`);
+  }
+
+  return notifications.length;
+}
+
+module.exports = { sendNotification, runChecks, runHourlyChecks, checkPostSyncCriticals };

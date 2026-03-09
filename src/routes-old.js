@@ -7,15 +7,44 @@ const cors = require('cors');
 const db = require('./database');
 const { chat, PROVIDERS, getConfig, saveConfig, validateKey } = require('./ai-engine');
 const ENabizScraper = require('./enabiz-scraper');
+const { checkPostSyncCriticals } = require('./notification-service');
 
 const router = express.Router();
 
 // E-Nabız scraper instances (per-patient)
 const enabizScrapers = new Map(); // patientId -> scraper
 const enabizStatuses = new Map(); // patientId -> status
+const keepAliveTimers = new Map(); // patientId -> intervalId
 
 function getEnabizStatus(patientId) {
   return enabizStatuses.get(patientId) || { state: 'idle', lastSync: null, error: null };
+}
+
+// Keep-alive timer başlat — her 10 dakikada bir oturumu canlı tut
+function startKeepAlive(patientId) {
+  stopKeepAlive(patientId); // Öncekini temizle
+  const timer = setInterval(async () => {
+    const scraper = enabizScrapers.get(patientId);
+    if (!scraper || !scraper.isLoggedIn) {
+      stopKeepAlive(patientId);
+      return;
+    }
+    const alive = await scraper.keepAlive();
+    if (!alive) {
+      enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'expired', error: 'Oturum düştü' });
+      stopKeepAlive(patientId);
+    }
+  }, 10 * 60 * 1000); // 10 dakika
+  keepAliveTimers.set(patientId, timer);
+  console.log(`💓 Keep-alive başlatıldı: Hasta ${patientId} (10 dk aralık)`);
+}
+
+function stopKeepAlive(patientId) {
+  const timer = keepAliveTimers.get(patientId);
+  if (timer) {
+    clearInterval(timer);
+    keepAliveTimers.delete(patientId);
+  }
 }
 
 // File upload config
@@ -149,13 +178,9 @@ router.delete('/patients/:id', (req, res) => {
   if (scraper) {
     scraper.close().catch(() => {});
     enabizScrapers.delete(id);
+    }
+    stopKeepAlive(id);
     enabizStatuses.delete(id);
-  }
-
-  res.json({ success: true });
-});
-
-router.get('/patient/:id', (req, res) => {
   const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(req.params.id);
   if (!patient) return res.status(404).json({ error: 'Hasta bulunamadı' });
   res.json(patient);
@@ -439,6 +464,7 @@ router.post('/enabiz/manual-login', async (req, res) => {
     const success = await scraper.manualLogin();
     if (success) {
       enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'connected' });
+      startKeepAlive(patientId);
       res.json({ success: true, message: 'E-Nabız giriş başarılı' });
     } else {
       enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'error', error: 'Giriş zaman aşımı' });
@@ -473,6 +499,7 @@ router.post('/enabiz/login', async (req, res) => {
     const success = await scraper.login(tc, password);
     if (success) {
       enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'connected' });
+      startKeepAlive(patientId);
       res.json({ success: true, message: 'E-Nabız giriş başarılı' });
     } else {
       enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'error', error: 'Giriş başarısız' });
@@ -496,6 +523,7 @@ router.post('/enabiz/fetch', async (req, res) => {
     }
 
     const type = req.body.type || 'all';
+    const syncStart = new Date().toISOString();
     enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'syncing' });
 
     let result;
@@ -516,6 +544,10 @@ router.post('/enabiz/fetch', async (req, res) => {
 
     const lastSync = new Date().toISOString();
     enabizStatuses.set(patientId, { state: 'connected', lastSync, error: null });
+
+    // Senkronizasyon sonrası kritik bulgu kontrolü
+    checkPostSyncCriticals(patientId, syncStart);
+
     res.json({ success: true, type, result, lastSync });
   } catch (e) {
     enabizStatuses.set(patientId, { ...getEnabizStatus(patientId), state: 'error', error: e.message });
@@ -534,6 +566,7 @@ router.post('/enabiz/disconnect', async (req, res) => {
       await scraper.close();
       enabizScrapers.delete(patientId);
     }
+    stopKeepAlive(patientId);
     const prevStatus = getEnabizStatus(patientId);
     enabizStatuses.set(patientId, { state: 'idle', lastSync: prevStatus.lastSync, error: null });
     res.json({ success: true, message: 'E-Nabız bağlantısı kapatıldı' });
@@ -542,4 +575,43 @@ router.post('/enabiz/disconnect', async (req, res) => {
   }
 });
 
+// Radyoloji görüntüsünü getir (E-Nabız üzerinden)
+router.get('/enabiz/radiology-image/:patientId/:imageId', async (req, res) => {
+  const patientId = parseInt(req.params.patientId);
+  const imageId = req.params.imageId;
+  if (!patientId || !imageId) return res.status(400).json({ error: 'patientId ve imageId gerekli' });
+
+  // Önce DB'den thumbnail kontrol et (bağlantı gerekmez)
+  try {
+    const dbRow = db.prepare(
+      "SELECT data FROM medical_events WHERE event_type='radiology' AND patient_id=? AND json_extract(data,'$.imageId')=?"
+    ).get(patientId, imageId);
+    if (dbRow) {
+      const d = JSON.parse(dbRow.data || '{}');
+      if (d.thumbnailData) {
+        return res.json({ success: true, imageData: d.thumbnailData });
+      }
+    }
+  } catch(e) { /* DB check failed, continue */ }
+
+  const scraper = enabizScrapers.get(patientId);
+  if (!scraper || !scraper.isLoggedIn) {
+    return res.status(400).json({ error: 'E-Nabız bağlantısı aktif değil. Önce giriş yapın.' });
+  }
+
+  try {
+    const result = await scraper.getRadiologyImage(imageId);
+    if (result && result.dataUrl) {
+      res.json({ success: true, imageData: result.dataUrl });
+    } else {
+      res.json({ success: false, error: 'Görüntü alınamadı. E-Nabız üzerinden görüntülemeyi deneyin.' });
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;
+module.exports.enabizScrapers = enabizScrapers;
+module.exports.enabizStatuses = enabizStatuses;
+module.exports.getEnabizStatus = getEnabizStatus;
